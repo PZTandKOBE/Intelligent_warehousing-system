@@ -4,6 +4,12 @@
   </div>
 </template>
 
+<script setup>
+import { ElConfigProvider } from 'element-plus'
+// 引入中文包
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs' 
+</script>
+
 <style>
 /* 简单的全局重置 */
 html, body, #app {
