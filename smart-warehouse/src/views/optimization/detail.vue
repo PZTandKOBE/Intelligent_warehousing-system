@@ -1,6 +1,6 @@
 <template>
   <div class="page-container">
-    <el-page-header @back="goBack" class="custom-header mb-20">
+    <el-page-header @back="goBack" title="返回列表" class="custom-header mb-20">
       <template #content>
         <div class="header-content">
           <span class="title">方案详情: {{ planId }}</span>
@@ -96,6 +96,7 @@ const route = useRoute();
 const router = useRouter();
 const planId = ref(route.params.id || 'OPT-UNKNOWN');
 
+// 保持 router.back()，即返回上一级页面
 const goBack = () => {
   router.back();
 };
@@ -121,7 +122,6 @@ const taskList = ref([
 ]);
 
 onMounted(() => {
-  // 这里未来会根据 planId 调用后端接口获取详情
   console.log('Fetching detail for:', planId.value);
 });
 </script>
@@ -165,7 +165,7 @@ onMounted(() => {
 .metric-item .label { font-size: 12px; color: #909399; margin-bottom: 5px; }
 .metric-item .value { font-size: 20px; font-weight: bold; }
 .metric-item .value.up { color: #67C23A; }
-.metric-item .value.down { color: #409EFF; } /* 节能是好事，用蓝色或绿色 */
+.metric-item .value.down { color: #409EFF; }
 .metric-divider { width: 1px; height: 30px; background: #4c4d4f; }
 
 /* 表格样式适配 */

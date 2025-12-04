@@ -59,8 +59,8 @@
             </template>
           </el-table-column>
           <el-table-column label="操作" width="150" fixed="right" align="center">
-            <template #default>
-              <el-button link type="primary" size="small">详情</el-button>
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="handleDetail(row)">详情</el-button>
               <el-button link type="danger" size="small">取消</el-button>
             </template>
           </el-table-column>
@@ -83,10 +83,10 @@
                   :key="plan.id"
                   class="plan-tag"
                   :class="plan.type"
-                  @click.stop="handlePlanClick(plan)"
+                  @click.stop="handleDetail(plan)"
                 >
                   <span class="dot"></span>
-                  <span class="text">{{ plan.skuCount }}种物料到货</span>
+                  <span class="text">{{ plan.skuCount }}种物料 ({{ getStatusLabel(plan.status) }})</span>
                 </div>
               </div>
             </div>
@@ -120,17 +120,20 @@
 
 <script setup>
 import { ref, reactive } from 'vue';
+import { useRouter } from 'vue-router'; // 引入 router
 import { List, Calendar, Plus } from '@element-plus/icons-vue';
 
-const viewMode = ref('list'); // 核心状态：list | calendar
-const calendarDate = ref(new Date());
+const router = useRouter(); // 初始化 router
+
+const viewMode = ref('list'); 
+const calendarDate = ref(new Date('2023-12-01')); // 调整默认时间以便看到数据
 const loading = ref(false);
 const dialogVisible = ref(false);
 
 const queryParams = reactive({ planId: '', status: '', dateRange: [] });
 const newPlanForm = reactive({ type: 'normal', remark: '' });
 
-// 模拟数据 (ETA 是预计到货时间，用于日历映射)
+// 模拟数据 (ID必须唯一，后续详情页通过这个ID来匹配数据)
 const planList = ref([
   { id: 'PL20231204001', type: 'urgent', skuCount: 3, totalAmount: 4500, createTime: '2023-12-04', eta: '2023-12-06', status: 'purchasing', progress: 40 },
   { id: 'PL20231201005', type: 'normal', skuCount: 15, totalAmount: 128000, createTime: '2023-12-01', eta: '2023-12-10', status: 'shipping', progress: 70 },
@@ -138,12 +141,10 @@ const planList = ref([
   { id: 'PL20231120009', type: 'normal', skuCount: 22, totalAmount: 210000, createTime: '2023-11-20', eta: '2023-11-25', status: 'done', progress: 100 },
 ]);
 
-// 日历辅助函数：根据日期获取当天的计划
 const getPlansByDate = (dateStr) => {
   return planList.value.filter(item => item.eta === dateStr);
 };
 
-// 状态字典
 const getStatusLabel = (status) => {
   const map = { pending: '待审批', purchasing: '采购中', shipping: '运输中', done: '已入库' };
   return map[status] || status;
@@ -155,29 +156,32 @@ const getStatusType = (status) => {
 
 const handleSearch = () => { loading.value = true; setTimeout(() => loading.value = false, 500); };
 const resetQuery = () => { queryParams.planId = ''; };
-const handlePlanClick = (plan) => { console.log('查看日历计划详情', plan); };
+
+// 核心跳转逻辑
+const handleDetail = (plan) => {
+  console.log('跳转至详情，ID:', plan.id);
+  router.push({
+    path: '/replenishment/detail',
+    query: { id: plan.id } // 将ID作为参数传递
+  });
+};
 </script>
 
 <style scoped>
-/* ================= 页面通用布局 ================= */
+/* 样式与之前保持一致 */
 .page-container { 
   height: 100%; 
-  /* 关键修改：加上 box-sizing: border-box */
   box-sizing: border-box;
-  padding: 10px; /* 减小内边距 */
+  padding: 10px; 
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 强制隐藏最外层滚动条 */
+  overflow: hidden; 
 }
 
 .mb-20 { margin-bottom: 10px; }
-
-/* 搜索栏 */
 .search-card { background: #1d1e1f; border: 1px solid #333; }
 .search-bar { display: flex; justify-content: space-between; align-items: flex-start; }
 .right-actions { display: flex; align-items: center; }
-
-/* 内容区域 */
 .content-wrapper { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .h-full { height: 100%; }
 .box-card { 
@@ -190,16 +194,10 @@ const handlePlanClick = (plan) => { console.log('查看日历计划详情', plan
 }
 
 :deep(.el-card__body) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%; 
-  padding: 10px; /* 卡片内部减小 padding */
-  box-sizing: border-box; /* 关键修改 */
-  overflow: hidden;
+  flex: 1; display: flex; flex-direction: column; height: 100%; 
+  padding: 10px; box-sizing: border-box; overflow: hidden;
 }
 
-/* 表格去白底 */
 .custom-table {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
@@ -211,119 +209,45 @@ const handlePlanClick = (plan) => { console.log('查看日历计划详情', plan
   background-color: transparent !important;
 }
 
-:deep(.el-table), 
-:deep(.el-table tr), 
-:deep(.el-table th.el-table__cell), 
-:deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; 
-  color: #cfd3dc; 
-  border-bottom: 1px solid #333 !important;
+:deep(.el-table), :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
+  background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important;
 }
-
-:deep(.el-table th.el-table__cell) { 
-  background-color: #262729 !important; 
-  color: #fff; 
-  font-weight: 600;
-}
+:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: 600; }
 :deep(.el-table__inner-wrapper::before) { display: none !important; }
-
-/* 分页居右 */
 .pagination-container { display: flex; justify-content: flex-end; margin-top: 15px; }
 
-/* 日历样式修复 */
 .calendar-card { overflow-y: auto; }
-:deep(.el-calendar) { 
-  background-color: transparent; 
-  --el-calendar-border: 1px solid #333;
-  --el-calendar-selected-bg-color: #2c3e50;
-}
+:deep(.el-calendar) { background-color: transparent; --el-calendar-border: 1px solid #333; --el-calendar-selected-bg-color: #2c3e50; }
 :deep(.el-calendar__header) { border-bottom: 1px solid #333; padding: 12px 0; }
 :deep(.el-calendar__title) { color: #fff; }
-
-/* 日历按钮组样式 */
-:deep(.el-calendar__button-group .el-button) {
-  background-color: #262729;
-  border-color: #4c4d4f;
-  color: #cfd3dc;
-}
-:deep(.el-calendar__button-group .el-button:hover) {
-  color: #409EFF;
-  border-color: #409EFF;
-  background-color: #262729;
-}
-:deep(.el-calendar__button-group .el-button:active) { background-color: #1d1e1f; }
-
-/* 日历主体 */
+:deep(.el-calendar__button-group .el-button) { background-color: #262729; border-color: #4c4d4f; color: #cfd3dc; }
+:deep(.el-calendar__button-group .el-button:hover) { color: #409EFF; border-color: #409EFF; }
 :deep(.el-calendar__body) { padding: 0; }
 :deep(.el-calendar-table thead th) { color: #909399; }
-:deep(.el-calendar-table td.el-calendar-day) { 
-  height: 100px; 
-  padding: 5px; 
-  box-sizing: border-box; 
-  border-bottom: 1px solid #333;
-  border-right: 1px solid #333;
-}
+:deep(.el-calendar-table td.el-calendar-day) { height: 100px; padding: 5px; box-sizing: border-box; border-bottom: 1px solid #333; border-right: 1px solid #333; }
 :deep(.el-calendar-table td:hover) { background-color: #262729; }
-:deep(.el-calendar-table tr:first-child td) { border-top: 1px solid #333; }
-:deep(.el-calendar-table tr td:first-child) { border-left: 1px solid #333; }
 :deep(.el-calendar-table td.is-selected) { background-color: #2c3e50; }
 
-/* 日历格子内容 */
 .calendar-cell { height: 100%; display: flex; flex-direction: column; }
 .day-num { font-size: 14px; color: #909399; margin-bottom: 4px; text-align: right; margin-right: 5px; }
 .plan-events { flex: 1; overflow-y: auto; }
-
 .plan-tag {
-  font-size: 12px;
-  margin-bottom: 2px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  background-color: #333;
-  color: #ccc;
+  font-size: 12px; margin-bottom: 2px; padding: 2px 4px; border-radius: 4px;
+  cursor: pointer; display: flex; align-items: center; background-color: #333; color: #ccc;
   border-left: 3px solid #909399;
 }
 .plan-tag:hover { opacity: 0.8; }
 .plan-tag.urgent { background-color: rgba(245, 108, 108, 0.2); color: #f89898; border-left-color: #F56C6C; }
 .plan-tag.normal { background-color: rgba(64, 158, 255, 0.2); color: #a0cfff; border-left-color: #409EFF; }
 
-/* 通用组件覆盖 */
-:deep(.el-input__wrapper), :deep(.el-date-editor) {
-  background-color: #262729;
-  box-shadow: 0 0 0 1px #4c4d4f inset;
-}
+:deep(.el-input__wrapper), :deep(.el-date-editor) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
 :deep(.el-input__inner) { color: #fff; }
-:deep(.el-button--default) {
-  background: transparent;
-  border-color: #4c4d4f;
-  color: #fff;
-}
-:deep(.el-button--default:hover) { color: #409EFF; border-color: #409EFF; }
-
-/* 弹窗 */
+:deep(.el-button--default) { background: transparent; border-color: #4c4d4f; color: #fff; }
 :deep(.el-dialog) { background: #1d1e1f; border: 1px solid #333; }
 :deep(.el-dialog__title) { color: #fff; }
 :deep(.el-radio__label) { color: #cfd3dc; }
-:deep(.el-textarea__inner) {
-  background-color: #262729;
-  box-shadow: 0 0 0 1px #4c4d4f inset;
-  color: #fff;
-}
-
-/* Radio Button */
-:deep(.el-radio-button__inner) {
-  background: #262729;
-  border-color: #4c4d4f;
-  color: #cfd3dc;
-  box-shadow: none;
-}
+:deep(.el-textarea__inner) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff; }
+:deep(.el-radio-button__inner) { background: #262729; border-color: #4c4d4f; color: #cfd3dc; box-shadow: none; }
 :deep(.el-radio-button:first-child .el-radio-button__inner) { border-left: 1px solid #4c4d4f; }
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background-color: #409EFF;
-  border-color: #409EFF;
-  color: #fff;
-  box-shadow: -1px 0 0 0 #409EFF;
-}
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #409EFF; border-color: #409EFF; color: #fff; }
 </style>

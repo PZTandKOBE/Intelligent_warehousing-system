@@ -134,42 +134,45 @@ const toggleMove = () => {
 </script>
 
 <style scoped>
+/* 请确保最外层的 class 名称与您 template 里的根元素一致 */
+/* 如果您的根元素叫 class="dashboard-container"，请对应修改 */
 .dashboard-container {
-  padding: 20px;
-  overflow-x: hidden; 
-}
-
-.header {
+  height: 100%;
+  width: 100%;
+  
+  /* 核心修复：防止 padding 撑出滚动条 */
+  box-sizing: border-box;
+  
+  /* 减小内边距 */
+  padding: 10px;
+  
+  /* 强制隐藏整个页面的滚动条 */
+  overflow: hidden;
+  
+  /* 布局设置 */
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  flex-direction: column;
+  background-color: #141414; /* 确保背景色 */
 }
 
-.chart-wrapper {
-  background: #1d1e1f;
-  border-radius: 8px;
-  padding: 20px;
+/* 如果内容区域（如图表）需要单独滚动，请给内容区加上 overflow-y: auto */
+/* 如果希望完全不滚动，保持默认或 hidden 即可 */
+
+/* 下面是针对暗黑模式下卡片去白边的通用修正，建议加上 */
+:deep(.el-card) {
   border: 1px solid #333;
-  height: 55vh; 
-}
-
-/* 统一底部卡片内容高度和样式 */
-.content-box {
-  height: 40px; 
-  display: flex;
-  align-items: center; 
-  gap: 10px; 
-}
-.content-box h3 {
-  margin: 0;
-  font-size: 24px; 
-  line-height: 1;  
-}
-
-.data-card {
   background-color: #1d1e1f;
-  border: 1px solid #333;
   color: #fff;
+}
+
+:deep(.el-card__header) {
+  border-bottom: 1px solid #333;
+  padding: 10px 15px; /* 头部紧凑一点 */
+}
+
+:deep(.el-card__body) {
+  /* 确保卡片内部也不会随便撑开 */
+  box-sizing: border-box; 
+  padding: 10px;
 }
 </style>

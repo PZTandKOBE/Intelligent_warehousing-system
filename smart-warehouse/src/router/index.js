@@ -25,8 +25,6 @@ const routes = [
           {
             path: 'list',
             name: 'InventoryList',
-            // 注意：这里我指向了 index.vue，因为那是我们之前写好的漂亮表格
-            // 如果你想用 list.vue，请改为 import('@/views/inventory/list.vue')
             component: () => import('@/views/inventory/index.vue'),
             meta: { title: '库存查询' }
           },
@@ -37,7 +35,7 @@ const routes = [
             meta: { title: '风险预警' }
           },
           {
-            path: 'detail/:id?', // :id? 表示参数可选，方便演示
+            path: 'detail/:id?', // :id? 表示参数可选
             name: 'InventoryDetail',
             component: () => import('@/views/inventory/detail.vue'),
             meta: { title: '库存详情', hidden: true } // hidden: true 表示不在侧边栏显示
@@ -85,6 +83,14 @@ const routes = [
             name: 'ReplenishmentPlan',
             component: () => import('@/views/replenishment/plan.vue'),
             meta: { title: '补货计划' }
+          },
+          // === 新增：补货详情路由 ===
+          {
+            path: 'detail',
+            name: 'ReplenishmentDetail',
+            // 确保文件路径正确指向你的 detail.vue
+            component: () => import('@/views/replenishment/detail.vue'),
+            meta: { title: '补货详情', hidden: true }
           }
         ]
       },
@@ -97,12 +103,12 @@ const routes = [
         meta: { title: '报告管理', icon: 'Document' }
       },
 
-      // 6. Task 系统日志 (保留之前的亮点功能)
+      // 6. Task 系统日志
       {
         path: 'task',
         name: 'Task',
         component: () => import('@/views/task/index.vue'),
-        meta: { title: '系统日志', icon: 'Timer' } // 改个名字叫系统日志更专业
+        meta: { title: '系统日志', icon: 'Timer' }
       }
     ]
   },
