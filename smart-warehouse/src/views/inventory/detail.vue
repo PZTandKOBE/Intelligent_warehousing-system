@@ -215,77 +215,173 @@ const getStatusTag = (status) => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.ml-10 { margin-left: 10px; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
 
 /* 头部样式 */
-.header-bar { color: #fff; }
+.header-bar {
+  color: #fff;
+}
 
 /* --- 交互样式 --- */
 :deep(.el-page-header__left) {
-  color: #fff !important; 
+  color: #fff !important;
   transition: all 0.3s;
 }
+
 :deep(.el-page-header__left:hover) {
-  color: #409EFF !important; 
+  color: #409EFF !important;
   cursor: pointer;
 }
+
 :deep(.el-page-header__content) {
   color: #fff !important;
 }
 
 /* 物品详情样式 */
-.info-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  color: #fff; 
+.info-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
 }
-.img-box { 
-  background: #262729; height: 120px; display: flex; 
-  align-items: center; justify-content: center; border-radius: 4px; 
-}
-.item-header { display: flex; align-items: center; margin-bottom: 20px; }
-.item-header h2 { margin: 0; }
 
-:deep(.el-descriptions__body) { background: transparent !important; }
-:deep(.el-descriptions__label) { background: #262729 !important; color: #909399 !important; font-weight: bold;}
-:deep(.el-descriptions__content) { background: transparent !important; color: #fff !important; }
+.img-box {
+  background: #262729;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.item-header h2 {
+  margin: 0;
+}
+
+:deep(.el-descriptions__body) {
+  background: transparent !important;
+}
+
+:deep(.el-descriptions__label) {
+  background: #262729 !important;
+  color: #909399 !important;
+  font-weight: bold;
+}
+
+:deep(.el-descriptions__content) {
+  background: transparent !important;
+  color: #fff !important;
+}
 
 /* KPI 卡片 */
-.kpi-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  color: #fff; 
-  text-align: center; 
-  height: 120px; 
+.kpi-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+  text-align: center;
+  height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
-.kpi-card .label { color: #909399; font-size: 13px; }
-.kpi-card .value { font-size: 28px; font-weight: bold; margin: 5px 0; }
-.kpi-card .sub { font-size: 12px; color: #909399; margin-top: -5px; }
 
-.value.primary { color: #409EFF; }
-.value.success { color: #67C23A; }
-.value.warning { color: #E6A23C; }
-.value.info { color: #909399; }
+.kpi-card .label {
+  color: #909399;
+  font-size: 13px;
+}
+
+.kpi-card .value {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.kpi-card .sub {
+  font-size: 12px;
+  color: #909399;
+  margin-top: -5px;
+}
+
+.value.primary {
+  color: #409EFF;
+}
+
+.value.success {
+  color: #67C23A;
+}
+
+.value.warning {
+  color: #E6A23C;
+}
+
+.value.info {
+  color: #909399;
+}
 
 /* 底部 Tabs 卡片 */
-.box-card { background: #1d1e1f; border: 1px solid #333; color: #fff; }
-.history-card { background: #262729; border: 1px solid #333; color: #cfd3dc; padding: 10px; }
-.text-success { color: #67C23A; font-weight: bold; }
-.text-danger { color: #F56C6C; font-weight: bold; }
+.box-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+}
 
-:deep(.el-tabs__item) { color: #cfd3dc; }
-:deep(.el-tabs__item.is-active) { color: #409EFF; }
+.history-card {
+  background: #262729;
+  border: 1px solid #333;
+  color: #cfd3dc;
+  padding: 10px;
+}
+
+.text-success {
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.text-danger {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
+:deep(.el-tabs__item) {
+  color: #cfd3dc;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #409EFF;
+}
 
 /* 表格复用暗黑样式 */
-:deep(.el-table), :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important;
+:deep(.el-table),
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  color: #cfd3dc;
+  border-bottom: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; }
-:deep(.el-table__inner-wrapper::before) { display: none !important; }
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+}
+
+:deep(.el-table__inner-wrapper::before) {
+  display: none !important;
+}
 </style>

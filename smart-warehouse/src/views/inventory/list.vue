@@ -23,23 +23,34 @@
     </el-card>
 
     <el-card shadow="never" class="table-card">
-      <el-table :data="tableData" style="width: 100%" v-loading="loading" class="custom-table">
-        <el-table-column prop="code" label="物料编码" width="120" />
-        <el-table-column prop="name" label="物料名称" min-width="150" />
-        <el-table-column prop="spec" label="规格型号" width="150" />
-        <el-table-column prop="stock" label="当前库存" width="120">
+      <el-table 
+        :data="tableData" 
+        style="width: 100%" 
+        v-loading="loading" 
+        class="custom-table"
+        border
+      >
+        <el-table-column prop="code" label="物料编码" width="140" fixed show-overflow-tooltip />
+        <el-table-column prop="name" label="物料名称" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span style="color: #409EFF; font-weight: bold">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="spec" label="规格型号" width="150" show-overflow-tooltip />
+        <el-table-column prop="stock" label="当前库存" width="120" sortable>
           <template #default="{ row }">
             <span :class="getStockClass(row.stock)">{{ row.stock }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="unit" label="单位" width="80" />
+        <el-table-column prop="unit" label="单位" width="70" align="center" />
         <el-table-column prop="zone" label="所在库区" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
              <el-tag :type="row.status === '正常' ? 'success' : 'danger'" effect="dark" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        
+        <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" :icon="View" @click="viewDetail(row)">详情</el-button>
             <el-button link type="primary" :icon="Position">移库</el-button>
@@ -63,7 +74,6 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
-// 关键修复：引入图标组件
 import { Search, Refresh, Download, View, Position, Delete } from '@element-plus/icons-vue';
 
 const router = useRouter();
@@ -75,11 +85,15 @@ const searchForm = reactive({
   zone: ''
 });
 
+// 模拟数据
 const tableData = reactive([
   { code: 'M-2024001', name: 'STM32 控制芯片', spec: 'LQFP48', stock: 850, unit: 'pcs', zone: 'A区', status: '正常' },
   { code: 'M-2024002', name: '57步进电机', spec: '57HS22', stock: 120, unit: '台', zone: 'B区', status: '正常' },
   { code: 'M-2024003', name: '工业电源', spec: '24V 10A', stock: 15, unit: '台', zone: 'A区', status: '缺货' },
   { code: 'M-2024004', name: 'M4螺丝套装', spec: '304不锈钢', stock: 5000, unit: '包', zone: 'B区', status: '正常' },
+  // 再加几条数据测试滚动
+  { code: 'M-2024005', name: '无线通讯模块', spec: 'ESP32-WROOM', stock: 200, unit: 'pcs', zone: 'A区', status: '正常' },
+  { code: 'M-2024006', name: '散热风扇 12cm', spec: '12V 0.5A', stock: 60, unit: '个', zone: 'B区', status: '正常' },
 ]);
 
 const handleSearch = () => {
@@ -93,8 +107,11 @@ const resetSearch = () => {
   searchForm.zone = '';
 };
 
+// --- 核心修复：跳转带参数 ---
 const viewDetail = (row) => {
-  router.push('/inventory/detail');
+  // 必须加上 row.code，拼接到路径后面
+  // 最终路径变成：/inventory/detail/M-2024001
+  router.push(`/inventory/detail/${row.code}`);
 };
 
 const getStockClass = (val) => {
@@ -108,7 +125,7 @@ const getStockClass = (val) => {
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 
-/* 搜索卡片暗黑风 */
+/* 搜索卡片 */
 .search-card { background: #1d1e1f; border: 1px solid #333; }
 :deep(.el-form-item__label) { color: #cfd3dc; }
 :deep(.el-input__wrapper), :deep(.el-select__wrapper) { 
@@ -117,18 +134,35 @@ const getStockClass = (val) => {
 }
 :deep(.el-input__inner) { color: #fff; }
 
-/* 表格卡片暗黑风 */
+/* 表格卡片 */
 .table-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-table), :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important;
-}
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold;}
-:deep(.el-table__inner-wrapper::before) { display: none !important; }
 
-/* 悬停行高亮修复 */
-:deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
-  background-color: #262729 !important;
+/* 表格样式穿透 */
+:deep(.el-table) {
+  --el-table-border-color: #333;
+  --el-table-header-bg-color: #262729;
+  --el-table-row-hover-bg-color: #2c3e50;
+  background-color: transparent !important;
+  color: #cfd3dc;
 }
+
+:deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
+  background-color: transparent !important; 
+  border-bottom: 1px solid #333 !important;
+  border-right: 1px solid #333 !important; /* 加回竖线，看数据更清晰 */
+}
+
+:deep(.el-table th.el-table__cell) { 
+  background-color: #262729 !important; 
+  color: #fff; 
+  font-weight: bold;
+}
+
+/* 按钮链接样式微调 */
+:deep(.el-button--primary.is-link) { color: #409EFF; }
+:deep(.el-button--primary.is-link:hover) { color: #79bbff; }
+:deep(.el-button--danger.is-link) { color: #F56C6C; }
+:deep(.el-button--danger.is-link:hover) { color: #f89898; }
 
 .pagination-container { display: flex; justify-content: flex-end; margin-top: 20px; }
 .text-success { color: #67C23A; font-weight: bold; }

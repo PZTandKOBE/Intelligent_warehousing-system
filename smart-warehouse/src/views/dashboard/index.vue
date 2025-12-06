@@ -1,56 +1,64 @@
 <template>
-  <div class="dashboard-container">
-    <div class="header">
-      <h2>🚀 智能仓储监控中心 (WMS Monitor)</h2>
-      <el-button 
-        :type="store.isRunning ? 'danger' : 'primary'" 
-        size="small" 
-        @click="toggleMove"
-      >
-        {{ store.isRunning ? '停止模拟 (Stop)' : '启动夜间模式 (Start)' }}
-      </el-button>
+  <div class="analysis-container">
+    <div class="header-controls">
+      <h2>📊 运营数据概览</h2>
+      <el-radio-group v-model="timeRange" size="small" @change="handleTimeChange">
+        <el-radio-button label="7d">近 7 天</el-radio-button>
+        <el-radio-button label="30d">近 30 天</el-radio-button>
+      </el-radio-group>
     </div>
 
-    <div class="chart-wrapper">
-      <BaseChart :options="chartOptions" height="100%" />
-    </div>
-    
-    <el-row :gutter="20" class="status-row">
-      <el-col :span="6" class="status-col">
-        <el-card shadow="hover" class="data-card">
-          <template #header>AGV 在线状态</template>
-          <div class="content-box">
-            <el-tag type="success">空闲 5</el-tag>
-            <el-tag type="primary">工作中 6</el-tag>
-            <el-tag type="danger">维护 1</el-tag>
-          </div>
+    <el-row :gutter="20" class="mb-20">
+      <el-col :span="6">
+        <el-card shadow="hover" class="kpi-card">
+          <template #header><span class="card-title">💰 库存总金额</span></template>
+          <div class="number">¥ 1,245,000</div>
+          <div class="trend up">环比 +12% <el-icon><Top /></el-icon></div>
         </el-card>
       </el-col>
-
-      <el-col :span="6" class="status-col">
-        <el-card shadow="hover" class="data-card">
-          <template #header>今日吞吐量</template>
-          <div class="content-box">
-             <h3 style="color: #409EFF">3,450 件</h3>
-          </div>
+      <el-col :span="6">
+        <el-card shadow="hover" class="kpi-card">
+          <template #header><span class="card-title">🚛 本月出库量</span></template>
+          <div class="number">8,540</div>
+          <div class="trend down">环比 -5% <el-icon><Bottom /></el-icon></div>
         </el-card>
       </el-col>
-
-      <el-col :span="6" class="status-col">
-        <el-card shadow="hover" class="data-card">
-          <template #header>预测准确率</template>
-          <div class="content-box">
-             <h3 style="color: #E6A23C">94.5%</h3>
-          </div>
+      <el-col :span="6">
+        <el-card shadow="hover" class="kpi-card">
+          <template #header><span class="card-title">📥 本月入库量</span></template>
+          <div class="number">9,200</div>
+          <div class="trend up">环比 +8% <el-icon><Top /></el-icon></div>
         </el-card>
       </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="kpi-card">
+          <template #header><span class="card-title">⚠️ 呆滞物料数</span></template>
+          <div class="number danger">145</div>
+          <div class="desc">占库存总量 1.5%</div>
+        </el-card>
+      </el-col>
+    </el-row>
 
-      <el-col :span="6" class="status-col">
-        <el-card shadow="hover" class="data-card">
-          <template #header>空间利用率</template>
-          <div class="content-box">
-             <h3 style="color: #F56C6C">82%</h3>
-          </div>
+    <el-row :gutter="20" class="mb-20">
+      <el-col :span="16">
+        <el-card shadow="never" class="chart-card">
+          <template #header>📈 库存金额趋势 ({{ timeRange }})</template>
+          <BaseChart :options="amountTrendOptions" height="320px" />
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="never" class="chart-card">
+          <template #header>🍩 物料活跃度分布</template>
+          <BaseChart :options="categoryPieOptions" height="320px" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row>
+      <el-col :span="24">
+        <el-card shadow="never" class="chart-card">
+          <template #header>⚖️ 出入库数量对比</template>
+          <BaseChart :options="inOutBarOptions" height="300px" />
         </el-card>
       </el-col>
     </el-row>
@@ -58,159 +66,91 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue';
+import { ref, reactive } from 'vue';
+import { Top, Bottom } from '@element-plus/icons-vue';
 import BaseChart from '@/components/BaseChart.vue';
-import { useWarehouseStore } from '@/stores/warehouse'; 
 
-const store = useWarehouseStore();
+const timeRange = ref('7d');
 
-const shelvesData = [];
-for (let y = 0; y < 10; y++) {
-  for (let x = 0; x < 10; x++) {
-    if (x !== 4 && x !== 5) shelvesData.push([x, y]);
-  }
-}
-
-const chartOptions = reactive({
-  backgroundColor: 'transparent',
-  title: { 
-    text: 'Zone A - 实时作业热力图', 
-    left: 'center', 
-    textStyle: { color: '#fff' } 
+// 模拟数据源
+const dataMap = {
+  '7d': {
+    xAxis: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    amount: [820, 932, 901, 934, 1290, 1330, 1320],
+    in: [120, 132, 101, 134, 90, 230, 210],
+    out: [220, 182, 191, 234, 290, 330, 310]
   },
-  // 修改点：bottom 改为 0，让图表内容紧贴容器底部
-  grid: { left: '2%', right: '2%', top: '10%', bottom: '0%', containLabel: true },
+  '30d': {
+    xAxis: Array.from({length: 15}, (_, i) => `Day ${i+1}`), 
+    amount: Array.from({length: 15}, () => Math.floor(Math.random() * 1000 + 800)),
+    in: Array.from({length: 15}, () => Math.floor(Math.random() * 200 + 50)),
+    out: Array.from({length: 15}, () => Math.floor(Math.random() * 200 + 50))
+  }
+};
+
+const amountTrendOptions = reactive({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis' },
+  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+  xAxis: { type: 'category', boundaryGap: false, data: dataMap['7d'].xAxis, axisLabel: { color: '#cfd3dc' } },
+  yAxis: { type: 'value', splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#cfd3dc' } },
+  series: [{
+    name: '库存金额', type: 'line', smooth: true, itemStyle: { color: '#409EFF' }, areaStyle: { color: 'rgba(64,158,255,0.2)' },
+    data: dataMap['7d'].amount
+  }]
+});
+
+const categoryPieOptions = reactive({
+  backgroundColor: 'transparent',
   tooltip: { trigger: 'item' },
-  xAxis: { type: 'value', show: false, min: -1, max: 11 },
-  yAxis: { type: 'value', show: false, min: -1, max: 11 },
-  animationDurationUpdate: 1000,
-  animationEasingUpdate: 'cubicOut',
+  legend: { bottom: '0%', textStyle: { color: '#cfd3dc' } },
+  series: [{
+    name: '活跃度', type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'],
+    itemStyle: { borderRadius: 5, borderColor: '#1d1e1f', borderWidth: 2 },
+    data: [
+      { value: 1048, name: '高频物料', itemStyle: { color: '#409EFF' } },
+      { value: 735, name: '中频物料', itemStyle: { color: '#E6A23C' } },
+      { value: 580, name: '低频物料', itemStyle: { color: '#909399' } },
+      { value: 145, name: '呆滞物料', itemStyle: { color: '#F56C6C' } }
+    ]
+  }]
+});
+
+const inOutBarOptions = reactive({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  legend: { textStyle: { color: '#cfd3dc' }, right: 10 },
+  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+  xAxis: { type: 'category', data: dataMap['7d'].xAxis, axisLabel: { color: '#cfd3dc' } },
+  yAxis: { type: 'value', splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#cfd3dc' } },
   series: [
-    {
-      type: 'scatter',
-      symbol: 'rect',
-      symbolSize: [45, 45],
-      itemStyle: { color: '#2c3e50', opacity: 0.6 },
-      data: shelvesData,
-      silent: true
-    },
-    {
-      name: 'AGV',
-      type: 'scatter',
-      symbol: 'circle', 
-      symbolSize: 25,
-      itemStyle: { 
-        color: '#e74c3c', 
-        shadowBlur: 20, 
-        shadowColor: '#e74c3c' 
-      },
-      data: [[0, 0]], 
-      z: 10
-    }
+    { name: '入库量', type: 'bar', itemStyle: { color: '#67C23A' }, data: dataMap['7d'].in },
+    { name: '出库量', type: 'bar', itemStyle: { color: '#F56C6C' }, data: dataMap['7d'].out }
   ]
 });
 
-watch(
-  () => store.agvPosition,
-  (newPos) => {
-    chartOptions.series[1].data = [newPos];
-  },
-  { deep: true }
-);
-
-const toggleMove = () => {
-  if (store.isRunning) {
-    store.stopSimulation();
-  } else {
-    store.startSimulation();
-  }
+const handleTimeChange = (val) => {
+  const currentData = dataMap[val];
+  amountTrendOptions.xAxis.data = currentData.xAxis;
+  amountTrendOptions.series[0].data = currentData.amount;
+  inOutBarOptions.xAxis.data = currentData.xAxis;
+  inOutBarOptions.series[0].data = currentData.in;
+  inOutBarOptions.series[1].data = currentData.out;
 };
 </script>
 
 <style scoped>
-.dashboard-container {
-  height: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px;
-  overflow: hidden; /* 防止滚动条 */
-  display: flex;
-  flex-direction: column;
-  background-color: #141414; 
-}
-
-.header {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #fff;
-  margin-bottom: 5px;
-}
-
-/* 
-  核心修改：
-  1. 不使用 flex: 1，而是指定高度 65vh (占屏幕65%)
-  2. 这样图表足够大，但下方会留出固定空间给卡片
-*/
-.chart-wrapper {
-  height: 65vh; 
-  width: 100%;
-  min-height: 400px; /* 保证在超扁的屏幕上也不会太小 */
-}
-
-/* 
-  核心修改：
-  margin-top 设为 10px，让卡片紧跟在图表下面
-*/
-.status-row {
-  margin-top: 10px; 
-  flex-shrink: 0; /* 防止卡片被压缩 */
-  display: flex; 
-  align-items: stretch; 
-}
-
-.status-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.data-card {
-  flex: 1; 
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #333;
-  background-color: #1d1e1f;
-  color: #fff;
-}
-
-:deep(.el-card__body) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center; 
-  align-items: center; 
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-:deep(.el-card__header) {
-  border-bottom: 1px solid #333;
-  padding: 8px 15px;
-  text-align: center;
-  font-weight: bold;
-}
-
-.content-box {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.content-box h3 {
-  margin: 0;
-  font-size: 24px;
-}
+.analysis-container { padding: 20px; box-sizing: border-box; }
+.header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: #fff; }
+.mb-20 { margin-bottom: 20px; }
+.kpi-card, .chart-card { background: #1d1e1f; border: 1px solid #333; color: #fff; }
+.card-title { font-weight: bold; font-size: 14px; }
+.number { font-size: 24px; font-weight: bold; margin: 10px 0; }
+.number.danger { color: #F56C6C; }
+.trend { font-size: 13px; display: flex; align-items: center; }
+.trend.up { color: #67C23A; }
+.trend.down { color: #F56C6C; }
+.desc { font-size: 12px; color: #909399; }
+:deep(.el-radio-button__inner) { background: #262729; border-color: #4c4d4f; color: #cfd3dc; box-shadow: none; }
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #409EFF; border-color: #409EFF; color: #fff; }
 </style>

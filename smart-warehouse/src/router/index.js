@@ -1,109 +1,125 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import Layout from '@/layout/index.vue'
 
 const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/dashboard',
+    redirect: '/dashboard/analysis',
     children: [
-      // 1. Dashboard 首页
+      // 1. 仪表盘 (父级)
       {
         path: 'dashboard',
         name: 'Dashboard',
-        component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '首页仪表盘', icon: 'Monitor' }
+        meta: { title: '仪表盘', icon: 'Monitor' },
+        redirect: '/dashboard/analysis',
+        component: RouterView, // 渲染子路由的容器
+        children: [
+          {
+            path: 'analysis',
+            name: 'DashboardAnalysis',
+            component: () => import('@/views/dashboard/index.vue'),
+            meta: { title: '数据概览' }
+          },
+          {
+            path: 'monitor',
+            name: 'DashboardMonitor',
+            component: () => import('@/views/dashboard/monitor.vue'),
+            meta: { title: '仓库监控' }
+          }
+        ]
       },
-
-      // 2. Inventory 库存管理
+      // 2. 库存管理
       {
         path: 'inventory',
         name: 'Inventory',
         meta: { title: '库存管理', icon: 'Box' },
-        redirect: '/inventory/list', // 默认跳到列表
+        redirect: '/inventory/list',
         children: [
           {
             path: 'list',
             name: 'InventoryList',
-            component: () => import('@/views/inventory/index.vue'),
+            component: () => import('@/views/inventory/list.vue'),
             meta: { title: '库存查询' }
           },
           {
-            path: 'alert',
-            name: 'InventoryAlert',
-            component: () => import('@/views/inventory/alert.vue'),
-            meta: { title: '风险预警' }
-          },
-          {
-            path: 'detail/:id?', // :id? 表示参数可选
+            path: 'detail/:id',
             name: 'InventoryDetail',
             component: () => import('@/views/inventory/detail.vue'),
-            meta: { title: '库存详情', hidden: true } // hidden: true 表示不在侧边栏显示
+            meta: { title: '库存详情', hidden: true }
+          },
+          {
+            path: 'alerts',
+            name: 'InventoryAlerts',
+            component: () => import('@/views/inventory/alert.vue'),
+            meta: { title: '库存预警' }
           }
         ]
       },
-
-      // 3. Optimization 优化方案
+      // 3. 库存优化
       {
         path: 'optimization',
         name: 'Optimization',
-        meta: { title: '优化方案', icon: 'MagicStick' },
-        redirect: '/optimization/list',
+        meta: { title: '库存优化', icon: 'MagicStick' },
+        redirect: '/optimization/plans',
         children: [
           {
-            path: 'list',
-            name: 'OptimizationList',
+            path: 'plans',
+            name: 'OptimizationPlans',
             component: () => import('@/views/optimization/index.vue'),
             meta: { title: '方案列表' }
           },
           {
-            path: 'detail/:id?',
+            path: 'plans/:id',
             name: 'OptimizationDetail',
             component: () => import('@/views/optimization/detail.vue'),
             meta: { title: '方案详情', hidden: true }
           }
         ]
       },
-
-      // 4. Replenishment 补货建议
+      // 4. 补货预测
       {
         path: 'replenishment',
         name: 'Replenishment',
-        meta: { title: '补货建议', icon: 'Van' },
-        redirect: '/replenishment/list',
+        meta: { title: '补货预测', icon: 'Van' },
+        redirect: '/replenishment/recommendations',
         children: [
           {
-            path: 'list',
-            name: 'ReplenishmentList',
+            path: 'recommendations',
+            name: 'ReplenishmentRecommendations',
             component: () => import('@/views/replenishment/index.vue'),
-            meta: { title: '补货列表' }
+            meta: { title: '补货建议' }
           },
           {
-            path: 'plan',
-            name: 'ReplenishmentPlan',
-            component: () => import('@/views/replenishment/plan.vue'),
-            meta: { title: '补货计划' }
-          },
-          // === 新增：补货详情路由 ===
-          {
-            path: 'detail',
+            path: 'recommendations/:id',
             name: 'ReplenishmentDetail',
-            // 确保文件路径正确指向你的 detail.vue
             component: () => import('@/views/replenishment/detail.vue'),
-            meta: { title: '补货详情', hidden: true }
+            meta: { title: '建议详情', hidden: true }
+          },
+          {
+            path: 'calendar',
+            name: 'ReplenishmentCalendar',
+            component: () => import('@/views/replenishment/plan.vue'),
+            meta: { title: '补货日历' }
           }
         ]
       },
-
-      // 5. Reports 报告管理
+      // 5. 报告管理
       {
         path: 'reports',
         name: 'Reports',
-        component: () => import('@/views/reports/index.vue'),
-        meta: { title: '报告管理', icon: 'Document' }
+        meta: { title: '报告管理', icon: 'Document' },
+        redirect: '/reports/list',
+        children: [
+          {
+            path: 'list',
+            name: 'ReportList',
+            component: () => import('@/views/reports/index.vue'),
+            meta: { title: '报告列表' }
+          }
+        ]
       },
-
-      // 6. Task 系统日志
+      // 6. 系统日志
       {
         path: 'task',
         name: 'Task',
