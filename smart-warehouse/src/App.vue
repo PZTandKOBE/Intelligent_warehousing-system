@@ -1,13 +1,15 @@
 <template>
-  <div class="app-container">
-    <router-view></router-view>
-  </div>
+  <el-config-provider :locale="zhCn">
+    <div class="app-container">
+      <router-view></router-view>
+    </div>
+  </el-config-provider>
 </template>
 
 <script setup>
 import { ElConfigProvider } from 'element-plus'
-// 引入中文包
-import zhCn from 'element-plus/dist/locale/zh-cn.mjs' 
+// 引入 Element Plus 中文语言包
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 </script>
 
 <style>

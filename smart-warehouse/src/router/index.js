@@ -7,13 +7,13 @@ const routes = [
     component: Layout,
     redirect: '/dashboard/analysis',
     children: [
-      // 1. 仪表盘 (父级)
+      // 1. 仪表盘
       {
         path: 'dashboard',
         name: 'Dashboard',
         meta: { title: '仪表盘', icon: 'Monitor' },
         redirect: '/dashboard/analysis',
-        component: RouterView, // 渲染子路由的容器
+        component: RouterView,
         children: [
           {
             path: 'analysis',
@@ -116,16 +116,16 @@ const routes = [
             name: 'ReportList',
             component: () => import('@/views/reports/index.vue'),
             meta: { title: '报告列表' }
+          },
+          {
+            path: 'detail/:id',
+            name: 'ReportDetail',
+            component: () => import('@/views/reports/detail.vue'),
+            meta: { title: '报告详情', hidden: true }
           }
         ]
-      },
-      // 6. 系统日志
-      {
-        path: 'task',
-        name: 'Task',
-        component: () => import('@/views/task/index.vue'),
-        meta: { title: '系统日志', icon: 'Timer' }
       }
+      // 6. 系统日志 (已删除，严格对齐文档)
     ]
   },
   {

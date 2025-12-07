@@ -52,11 +52,7 @@
           <span>报告管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/task">
-          <el-icon><Timer /></el-icon>
-          <span>系统日志</span>
-        </el-menu-item>
-      </el-menu>
+        </el-menu>
     </div>
 
     <div class="main-container">
@@ -81,7 +77,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { Monitor, Box, MagicStick, Van, Document, Timer } from '@element-plus/icons-vue';
+import { Monitor, Box, MagicStick, Van, Document } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);
@@ -99,7 +95,7 @@ const routeTitleMap = {
   'ReplenishmentDetail': '建议详情',
   'ReplenishmentCalendar': '补货日历',
   'ReportList': '报告管理',
-  'Task': '系统日志'
+  'ReportDetail': '报告详情'
 };
 
 const currentRouteName = computed(() => routeTitleMap[route.name] || route.name);
