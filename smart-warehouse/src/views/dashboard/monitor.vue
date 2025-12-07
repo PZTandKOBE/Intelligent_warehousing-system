@@ -3,9 +3,8 @@
     <div class="monitor-header">
       <div class="left">
         <h2>🧊 3D 仓库数字孪生 (Digital Twin)</h2>
-        
         <el-select 
-          v-model="currentZone" 
+          v-model="currentZoneId" 
           placeholder="切换库区" 
           size="default" 
           class="zone-select ml-10"
@@ -14,9 +13,8 @@
           <template #prefix>
             <el-icon><Location /></el-icon>
           </template>
-          <el-option label="Zone A - 电子元器件区" value="A" />
-          <el-option label="Zone B - 五金配件区" value="B" />
-          <el-option label="Zone C - 暂存区 (建设中)" value="C" disabled />
+          <el-option label="Zone A - 电子元器件区" :value="1" />
+          <el-option label="Zone B - 五金配件区" :value="2" />
         </el-select>
       </div>
 
@@ -24,68 +22,48 @@
         <div class="tips">
           <span>🖱️ 左键旋转</span>
           <span>🖱️ 右键平移</span>
-          <span>🖱️ 悬停高亮 / 点击查看</span>
+          <span>🖱️ 滚轮缩放</span>
         </div>
-        </div>
+      </div>
     </div>
 
     <div ref="threeContainer" class="three-canvas"></div>
 
     <div v-if="loading" class="loading-mask">
       <div class="loading-spinner"></div>
-      <p>正在切换至 {{ currentZone === 'A' ? '电子区' : '五金区' }} 数据...</p>
+      <p>正在同步物理世界数据...</p>
     </div>
-
-    <div class="map-legend">
-      <div class="legend-item"><span class="block normal"></span> 正常 (Normal)</div>
-      <div class="legend-item"><span class="block warning"></span> 积压 (Warning)</div>
-      <div class="legend-item"><span class="block critical"></span> 爆仓 (Critical)</div>
-      </div>
 
     <el-drawer
       v-model="drawerVisible"
-      title="库位详情"
-      size="380px"
+      title="📦 库位详情"
+      size="320px"
       :modal="false"
-      destroy-on-close
       class="monitor-drawer"
     >
       <div v-if="selectedBin" class="drawer-detail">
         <div class="detail-header">
           <h1 class="bin-code">{{ selectedBin.storage_code }}</h1>
-          <el-tag :type="getStatusType(selectedBin.usage_rate)" effect="dark" size="large">
-            {{ getStatusText(selectedBin.usage_rate) }}
+          <el-tag :type="getStatusType(selectedBin.value)" effect="dark" round>
+            {{ getStatusText(selectedBin.value) }}
           </el-tag>
         </div>
         
-        <el-divider border-style="dashed" />
-        
-        <el-descriptions :column="1" border class="dark-descriptions">
-          <el-descriptions-item label="当前物料">
-            <span style="color: #409EFF; font-weight: bold;">{{ selectedBin.material_name || '未知' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="当前数量">
-            <span class="desc-text" style="font-size: 16px;">{{ selectedBin.quantity || 0 }}</span> 
-            <span class="desc-text">{{ selectedBin.unit || 'pcs' }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="利用率">
-            <div class="progress-box">
-              <el-progress 
-                :percentage="selectedBin.usage_rate || 0" 
-                :status="getStatusType(selectedBin.usage_rate)" 
-                :stroke-width="10"
-              />
-            </div>
-          </el-descriptions-item>
-           <el-descriptions-item label="最近更新">
-            <span class="desc-text">{{ selectedBin.last_updated || '刚刚' }}</span>
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <div class="drawer-actions mt-20">
-          <el-button type="primary" size="large" style="width: 100%" @click="jumpToInventory(selectedBin.material_code)">
-            查看完整档案 >
-          </el-button>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">坐标位置</span>
+            <span class="value">[ {{ selectedBin.coordinate.join(', ') }} ]</span>
+          </div>
+          <div class="info-item">
+            <span class="label">库存价值</span>
+            <span class="value highlight">¥ {{ selectedBin.value }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">当前状态</span>
+            <span class="value" :style="{ color: getStatusColor(selectedBin.value) }">
+              {{ getStatusText(selectedBin.value) }}
+            </span>
+          </div>
         </div>
       </div>
     </el-drawer>
@@ -94,87 +72,92 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import { Location } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { getDashboardHeatmap, getStorageDetail } from '@/api/warehouse';
+import { getDashboardHeatmap } from '@/api/dashboard';
 
-const router = useRouter();
 const threeContainer = ref(null);
 const drawerVisible = ref(false);
 const selectedBin = ref(null);
 const loading = ref(true);
-const currentZone = ref('A');
+const currentZoneId = ref(1);
 
 let scene, camera, renderer, controls;
 let raycaster, mouse;
 let cubes = []; 
 let animationId;
-let intersectedObject = null; 
+let intersectedObject = null;
 
 const COLORS = {
   bg: 0x0b1120,
-  floor: 0x151b2b, 
-  grid: 0x334155,
-  normal: 0x3b82f6,
-  warning: 0xeab308,
-  critical: 0xef4444,
-  highlight: 0x666666 
+  grid: 0x1f2937,
+  floor: 0x111827,
+  boxNormal: 0x3b82f6,   
+  boxWarn: 0xf59e0b,     
+  boxCritical: 0xef4444, 
+  hover: 0x00ffff,       
+  hoverEmissive: 0x444444 
 };
 
 const initThree = () => {
+  if (!threeContainer.value) return;
   const width = threeContainer.value.clientWidth;
   const height = threeContainer.value.clientHeight;
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.bg);
-  scene.fog = new THREE.FogExp2(COLORS.bg, 0.025); 
+  scene.fog = new THREE.Fog(COLORS.bg, 80, 300);
 
-  camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-  camera.position.set(0, 12, 16); 
+  // 视角：保持 40 度，位置适中
+  camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+  camera.position.set(50, 60, 80);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
   threeContainer.value.appendChild(renderer.domElement);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.maxPolarAngle = Math.PI / 2 - 0.1;
-  controls.minDistance = 5;
-  controls.maxDistance = 40;
+  controls.dampingFactor = 0.05;
+  controls.minDistance = 2;
+  controls.maxDistance = 200;
+  controls.maxPolarAngle = Math.PI / 2 - 0.02; 
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); 
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
   scene.add(ambientLight);
   
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-  dirLight.position.set(10, 20, 10);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(30, 60, 40);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 4096; 
+  dirLight.shadow.mapSize.height = 4096;
+  const d = 150;
+  dirLight.shadow.camera.left = -d;
+  dirLight.shadow.camera.right = d;
+  dirLight.shadow.camera.top = d;
+  dirLight.shadow.camera.bottom = -d;
   scene.add(dirLight);
 
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
 
   createFloor();
-  // AGV 创建逻辑已移除
-
-  window.addEventListener('resize', onWindowResize);
-  window.addEventListener('click', onMouseClick);
-  window.addEventListener('mousemove', onMouseMove);
   
+  window.addEventListener('resize', onWindowResize);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('click', onMouseClick);
   animate();
 };
 
 const createFloor = () => {
-  const size = 50;
-  const divisions = 50;
-  const gridHelper = new THREE.GridHelper(size, divisions, COLORS.grid, COLORS.grid);
+  const size = 150;
+  const divisions = 75;
+  const gridHelper = new THREE.GridHelper(size, divisions, 0x374151, 0x1f2937);
   scene.add(gridHelper);
 
   const geometry = new THREE.PlaneGeometry(size, size);
@@ -194,56 +177,131 @@ const createFloor = () => {
 const loadDataAndBuild = async () => {
   loading.value = true;
   try {
-    const res = await getDashboardHeatmap(currentZone.value);
-    const dataList = res.data || [];
-    
+    const res = await getDashboardHeatmap({ 
+      warehouse_id: currentZoneId.value,
+      type: 'inventory_value' 
+    });
+
     cubes.forEach(cube => scene.remove(cube));
     cubes = [];
 
-    const geometry = new THREE.BoxGeometry(0.8, 1, 0.8);
+    if (res.code === 200 && res.data && res.data.points && res.data.points.length > 0) {
+      const points = res.data.points;
+      
+      const boxSize = 1.0; 
+      
+      // === ⚡️ 间隙核心调整区 ⚡️ ===
+      
+      // 1. 同排内间隙 (Z轴): 1.0 
+      // 没有任何缝隙，方块紧挨着方块，连成一条线
+      const binSpacing = 1.0; 
+      
+      // 2. 排与排间隙 (X轴): 1.2
+      // 这是一个很小的过道，刚好把货架分开，但看起来非常紧凑
+      const rackSpacing = 1.1; 
+      
+      // 3. 上下间隙 (Y轴): 0.8
+      // 垂直方向压缩，无缝堆叠
+      const levelSpacing = 0.2; 
 
-    dataList.forEach(item => {
-      let color = COLORS.normal;
-      if (item.value > 60) color = COLORS.warning;
-      if (item.value > 90) color = COLORS.critical;
+      const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
 
-      const material = new THREE.MeshStandardMaterial({ 
-        color: color,
-        roughness: 0.3,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.95
+      let minX = Infinity, maxX = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      let minLayer = Infinity;
+
+      points.forEach(p => {
+        const [row, col, layer] = p.coordinate || [0,0,0];
+        if (row < minX) minX = row;
+        if (row > maxX) maxX = row;
+        if (col < minZ) minZ = col;
+        if (col > maxZ) maxZ = col;
+        if (layer < minLayer) minLayer = layer;
       });
 
-      const cube = new THREE.Mesh(geometry, material);
-      const offsetX = currentZone.value === 'A' ? 12 : 10;
-      const offsetZ = currentZone.value === 'A' ? 6 : 8;
+      // 计算中心偏移
+      const totalWidthX = (maxX - minX) * rackSpacing;
+      const totalDepthZ = (maxZ - minZ) * binSpacing;
+      
+      const centerOffsetX = minX * rackSpacing + totalWidthX / 2;
+      const centerOffsetZ = minZ * binSpacing + totalDepthZ / 2;
 
-      const posX = item.x - offsetX; 
-      const posZ = item.y - offsetZ;
-      const heightScale = 0.2 + (item.value / 100) * 2.5;
-      
-      cube.scale.y = heightScale;
-      cube.position.set(posX, heightScale / 2, posZ);
-      cube.castShadow = true;
-      cube.receiveShadow = true;
-      cube.userData = { ...item }; 
-      
-      scene.add(cube);
-      cubes.push(cube);
-    });
-    
+      points.forEach(point => {
+        const [row, col, layer] = point.coordinate || [0,0,0];
+
+        let color = COLORS.boxNormal;
+        if (point.value > 5000) color = COLORS.boxWarn;
+        if (point.value > 20000) color = COLORS.boxCritical;
+
+        const material = new THREE.MeshStandardMaterial({ 
+          color: color, 
+          roughness: 0.4,
+          metalness: 0.1
+        });
+        
+        const cube = new THREE.Mesh(geometry, material);
+
+        // 应用排间距
+        const posX = row * rackSpacing - centerOffsetX;
+        
+        // 应用列间距 (紧密)
+        const posZ = col * binSpacing - centerOffsetZ;
+        
+        // 应用垂直间距
+        const normalizedLayer = layer - minLayer; 
+        const posY = normalizedLayer * levelSpacing + (boxSize / 2);
+
+        cube.position.set(posX, posY, posZ);
+        
+        cube.castShadow = true;
+        cube.receiveShadow = true;
+        cube.userData = { ...point, originalHex: color }; 
+        
+        scene.add(cube);
+        cubes.push(cube);
+      });
+
+      // 自动聚焦
+      fitCameraToSelection(camera, controls, cubes, 0.8); 
+
+      ElMessage.success(`渲染完成: ${points.length} 单元`);
+    } else {
+      ElMessage.warning('暂无数据');
+    }
   } catch (error) {
     console.error(error);
-    ElMessage.error('3D 数据加载失败');
+    ElMessage.error('数据同步失败');
   } finally {
     loading.value = false;
   }
 };
 
+const fitCameraToSelection = (camera, controls, selection, fitOffset = 1.0) => {
+  if (!selection || selection.length === 0) return;
+  const box = new THREE.Box3();
+  for(const object of selection) box.expandByObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z);
+  if (maxSize === 0) return;
+  
+  const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * camera.fov / 360));
+  const distance = fitOffset * fitHeightDistance;
+  
+  if (!isFinite(distance) || distance <= 0) return;
+
+  const direction = controls.target.clone().sub(camera.position).normalize().multiplyScalar(distance);
+  controls.maxDistance = distance * 10;
+  controls.target.copy(center);
+  camera.near = distance / 100;
+  camera.far = distance * 100;
+  camera.updateProjectionMatrix();
+  camera.position.copy(controls.target).sub(direction);
+  controls.update();
+};
+
 const handleZoneChange = () => {
-  drawerVisible.value = false;
-  loadDataAndBuild(); 
+  loadDataAndBuild();
 };
 
 const onMouseMove = (event) => {
@@ -252,21 +310,10 @@ const onMouseMove = (event) => {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 };
 
-const onMouseClick = (event) => {
+const onMouseClick = () => {
   if (intersectedObject) {
-    handleCubeClick(intersectedObject.userData.storage_code);
-  }
-};
-
-const handleCubeClick = async (code) => {
-  if (!code) return;
-  drawerVisible.value = true;
-  selectedBin.value = null;
-  try {
-    const res = await getStorageDetail(code);
-    selectedBin.value = res.data;
-  } catch (error) {
-    ElMessage.error('获取详情失败');
+    selectedBin.value = intersectedObject.userData;
+    drawerVisible.value = true;
   }
 };
 
@@ -274,23 +321,30 @@ const animate = () => {
   animationId = requestAnimationFrame(animate);
   controls.update();
 
-  // AGV 移动逻辑已移除
-
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(cubes);
 
   if (intersects.length > 0) {
-    if (intersectedObject !== intersects[0].object) {
-      if (intersectedObject) intersectedObject.material.emissive.setHex(intersectedObject.currentHex);
-      intersectedObject = intersects[0].object;
-      intersectedObject.currentHex = intersectedObject.material.emissive.getHex();
-      intersectedObject.material.emissive.setHex(COLORS.highlight);
+    const currentObject = intersects[0].object;
+    
+    if (intersectedObject !== currentObject) {
+      if (intersectedObject) {
+        intersectedObject.material.color.setHex(intersectedObject.userData.originalHex);
+        intersectedObject.material.emissive.setHex(0x000000); 
+        intersectedObject.scale.set(1, 1, 1);
+      }
+      intersectedObject = currentObject;
+      intersectedObject.material.color.setHex(COLORS.hover);
+      intersectedObject.material.emissive.setHex(0x333333); 
+      intersectedObject.scale.set(1.05, 1.05, 1.05); 
     }
   } else {
     if (intersectedObject) {
-      intersectedObject.material.emissive.setHex(intersectedObject.currentHex);
+      intersectedObject.material.color.setHex(intersectedObject.userData.originalHex);
+      intersectedObject.material.emissive.setHex(0x000000);
+      intersectedObject.scale.set(1, 1, 1);
+      intersectedObject = null;
     }
-    intersectedObject = null;
   }
 
   renderer.render(scene, camera);
@@ -305,6 +359,10 @@ const onWindowResize = () => {
   renderer.setSize(width, height);
 };
 
+const getStatusType = (val) => val > 20000 ? 'danger' : (val > 5000 ? 'warning' : 'success');
+const getStatusText = (val) => val > 20000 ? '爆仓' : (val > 5000 ? '积压' : '正常');
+const getStatusColor = (val) => val > 20000 ? '#F56C6C' : (val > 5000 ? '#E6A23C' : '#67C23A');
+
 onMounted(() => {
   initThree();
   loadDataAndBuild();
@@ -313,208 +371,69 @@ onMounted(() => {
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationId);
   window.removeEventListener('resize', onWindowResize);
-  window.removeEventListener('click', onMouseClick);
   window.removeEventListener('mousemove', onMouseMove);
+  window.removeEventListener('click', onMouseClick);
   if (renderer) renderer.dispose();
+  if (scene) scene.clear();
 });
-
-const getStatusType = (rate) => { if (rate >= 90) return 'danger'; if (rate >= 60) return 'warning'; return 'success'; };
-const getStatusText = (rate) => { if (rate >= 90) return '爆仓预警'; if (rate >= 60) return '库存积压'; return '正常流转'; };
-const jumpToInventory = (code) => { router.push(code ? { path: '/inventory/list', query: { keyword: code } } : '/inventory/list'); };
 </script>
 
 <style scoped>
-.monitor-container {
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    background-color: #0b1120;
+.monitor-container { height: 100%; position: relative; background-color: #0b1120; overflow: hidden; }
+.monitor-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
+.monitor-header .left, .monitor-header .right { pointer-events: auto; display: flex; align-items: center; }
+.monitor-header h2 { color: #fff; margin: 0; font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+.zone-select { width: 220px; }
+
+.three-canvas { width: 100%; height: 100%; display: block; }
+
+.loading-mask { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #409EFF; text-align: center; }
+.loading-spinner { border: 4px solid rgba(64, 158, 255, 0.3); border-top: 4px solid #409EFF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.tips { display: flex; gap: 15px; margin-right: 20px; color: #ccc; font-size: 12px; background: rgba(0, 0, 0, 0.6); padding: 6px 16px; border-radius: 20px; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
+
+:deep(.monitor-drawer) { 
+  background-color: rgba(20, 24, 30, 0.95) !important; 
+  backdrop-filter: blur(10px); 
+  border-left: 1px solid #374151; 
+  box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+}
+:deep(.el-drawer__title) { color: #fff; font-weight: bold; }
+:deep(.el-drawer__body) { padding: 20px; }
+
+.bin-code { font-size: 24px; color: #409EFF; margin: 0 0 10px 0; font-family: 'DIN', monospace; letter-spacing: 1px; }
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
 }
 
-.monitor-header {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    right: 20px;
-    z-index: 10;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    pointer-events: none;
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #374151;
 }
 
-.monitor-header .right,
-.monitor-header h2,
-.monitor-header .el-tag,
-.monitor-header .el-select,
-.monitor-header .el-button {
-    pointer-events: auto;
+.info-item .label {
+  color: #9ca3af;
+  font-size: 14px;
 }
 
-.three-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
+.info-item .value {
+  color: #fff;
+  font-weight: bold;
+  font-size: 15px;
 }
 
-.loading-mask {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #409EFF;
-    pointer-events: none;
-    text-align: center;
+.info-item .value.highlight {
+  color: #409EFF;
+  font-size: 18px;
 }
 
-.loading-spinner {
-    border: 4px solid rgba(64, 158, 255, 0.3);
-    border-top: 4px solid #409EFF;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 10px;
-}
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-.tips {
-    display: flex;
-    gap: 15px;
-    margin-right: 20px;
-    color: #aaa;
-    font-size: 12px;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 5px 15px;
-    border-radius: 20px;
-}
-
-.map-legend {
-    position: absolute;
-    bottom: 30px;
-    left: 30px;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    pointer-events: none;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    color: #fff;
-    margin-bottom: 5px;
-    font-size: 13px;
-}
-
-.block {
-    width: 12px;
-    height: 12px;
-    margin-right: 8px;
-    display: inline-block;
-    border: 1px solid #fff;
-}
-
-.block.normal {
-    background: #3b82f6;
-}
-
-.block.warning {
-    background: #eab308;
-}
-
-.block.critical {
-    background: #ef4444;
-}
-
-/* agv 样式可以删除，也可以保留不影响 */
-.block.agv {
-    background: #10b981;
-}
-
-:deep(.el-drawer) {
-    background-color: rgba(20, 24, 30, 0.95) !important;
-    backdrop-filter: blur(10px);
-    border-left: 1px solid #333;
-}
-
-:deep(.el-drawer__title) {
-    color: #fff;
-}
-
-:deep(.el-drawer__body) {
-    padding: 20px;
-}
-
-:deep(.dark-descriptions) {
-    --el-descriptions-table-border: 1px solid #444;
-    --el-descriptions-item-bordered-label-background: #1d2129;
-}
-
-:deep(.el-descriptions__body) {
-    background: transparent !important;
-    color: #fff !important;
-}
-
-:deep(.el-descriptions__label.el-descriptions__cell) {
-    background: #1d2129 !important;
-    color: #909399 !important;
-    font-weight: bold;
-}
-
-:deep(.el-descriptions__content.el-descriptions__cell) {
-    background: rgba(255, 255, 255, 0.02) !important;
-    color: #fff !important;
-}
-
-:deep(.el-progress__text) {
-    color: #fff !important;
-}
-
-/* 专门定制下拉框样式，让它透明融入背景 */
-:deep(.zone-select) {
-    width: 200px;
-}
-
-:deep(.zone-select .el-input__wrapper) {
-    background-color: rgba(0, 0, 0, 0.5) !important;
-    box-shadow: 0 0 0 1px #444 inset !important;
-    color: #fff;
-}
-
-:deep(.zone-select .el-input__inner) {
-    color: #fff !important;
-}
-
-.bin-code {
-    color: #409EFF;
-    margin: 0 0 10px 0;
-    font-size: 24px;
-}
-
-.desc-text {
-    color: #e5e7eb;
-}
-
-.progress-box {
-    padding-right: 10px;
-}
-
-.ml-10 {
-    margin-left: 10px;
-}
-
-.mt-20 {
-    margin-top: 20px;
-}
+.ml-10 { margin-left: 10px; }
 </style>
