@@ -47,12 +47,45 @@ const handleExport = () => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.ml-10 { margin-left: 10px; }
-.custom-header { background: #1d1e1f; padding: 15px; border: 1px solid #333; }
-:deep(.el-page-header__content) { color: #fff; }
-.detail-card { background: #1d1e1f; border: 1px solid #333; color: #cfd3dc; }
-.card-header { display: flex; justify-content: space-between; align-items: center; color: #fff; font-weight: bold; }
-.html-content { line-height: 1.6; color: #cfd3dc; padding: 10px; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.custom-header {
+  background: #1d1e1f;
+  padding: 15px;
+  border: 1px solid #333;
+}
+
+:deep(.el-page-header__content) {
+  color: #fff;
+}
+
+.detail-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #cfd3dc;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-weight: bold;
+}
+
+.html-content {
+  line-height: 1.6;
+  color: #cfd3dc;
+  padding: 10px;
+}
 </style>

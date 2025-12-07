@@ -171,7 +171,8 @@ const handleSubmit = () => {
 };
 
 const goDetail = (row) => {
-  router.push(`/optimization/detail/${row.planId}`);
+  // 核心修复：将跳转路径修改为与 router/index.js 中配置一致的 /optimization/plans/:id
+  router.push(`/optimization/plans/${row.planId}`);
 };
 </script>
 

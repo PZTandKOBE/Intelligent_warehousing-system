@@ -77,22 +77,57 @@ const getReportTypeTag = (type) => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.search-card { background: #1d1e1f; border: 1px solid #333; }
-.table-card { background: #1d1e1f; border: 1px solid #333; }
-.header { color: #fff; margin-bottom: 20px; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+.table-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+.header {
+  color: #fff;
+  margin-bottom: 20px;
+}
 
 /* 暗黑输入框适配 */
-:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) {
-  background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset;
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-date-editor) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
 }
-:deep(.el-input__inner) { color: #fff; }
-:deep(.el-form-item__label) { color: #cfd3dc; }
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+}
 
 /* 表格复用 */
-:deep(.el-table), :deep(.el-table th.el-table__cell), :deep(.el-table tr), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important;
+:deep(.el-table),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table tr),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  color: #cfd3dc;
+  border-bottom: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; }
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+}
 </style>

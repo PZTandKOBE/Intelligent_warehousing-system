@@ -72,34 +72,48 @@ const replenishList = reactive([
 
 <style scoped>
 /* 页面容器：Flex 纵向布局 */
-.page-container { 
-  height: 100%; 
+.page-container {
+  height: 100%;
   /* 关键修改：加上 box-sizing: border-box 防止 padding 撑开高度 */
   box-sizing: border-box;
-  padding: 10px; /* 减小内边距 */
+  padding: 10px;
+  /* 减小内边距 */
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 强制隐藏最外层滚动条 */
+  overflow: hidden;
+  /* 强制隐藏最外层滚动条 */
 }
 
-.mb-20 { margin-bottom: 10px; } /* 间距也相应调小 */
+.mb-20 {
+  margin-bottom: 10px;
+}
+
+/* 间距也相应调小 */
 
 /* KPI 卡片 */
-.kpi-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  color: #fff; 
-  text-align: center; 
+.kpi-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+  text-align: center;
 }
-.kpi-card .value { font-size: 24px; font-weight: bold; margin-top: 10px; }
-.kpi-card .value.danger { color: #F56C6C; }
+
+.kpi-card .value {
+  font-size: 24px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.kpi-card .value.danger {
+  color: #F56C6C;
+}
 
 /* 主体卡片 */
-.box-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  color: #fff; 
-  flex: 1; 
+.box-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -110,9 +124,11 @@ const replenishList = reactive([
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%; 
-  padding: 10px; /* 卡片内部也减小 padding */
-  box-sizing: border-box; /* 同样加上这个 */
+  height: 100%;
+  padding: 10px;
+  /* 卡片内部也减小 padding */
+  box-sizing: border-box;
+  /* 同样加上这个 */
   overflow: hidden;
 }
 
@@ -130,33 +146,50 @@ const replenishList = reactive([
   margin-bottom: 4px;
   color: #909399;
 }
-.divider { margin: 0 4px; color: #555; }
+
+.divider {
+  margin: 0 4px;
+  color: #555;
+}
 
 /* 样式覆盖 (暗黑模式) */
-:deep(.el-table), 
-:deep(.el-table tr), 
-:deep(.el-table th.el-table__cell), 
+:deep(.el-table),
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
 :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; 
-  color: #cfd3dc; 
+  background-color: transparent !important;
+  color: #cfd3dc;
   border-bottom: 1px solid #333 !important;
 }
 
-:deep(.el-table th.el-table__cell) { 
-  background-color: #262729 !important; 
-  color: #fff; 
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
   font-weight: 600;
 }
 
-:deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) { 
-  background-color: #2c3e50 !important; 
+:deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
+  background-color: #2c3e50 !important;
 }
 
-:deep(.el-table__inner-wrapper::before) { display: none !important; }
-:deep(.el-table__border-left-patch) { display: none !important; }
+:deep(.el-table__inner-wrapper::before) {
+  display: none !important;
+}
+
+:deep(.el-table__border-left-patch) {
+  display: none !important;
+}
 
 /* Tabs */
-:deep(.el-tabs__item) { color: #cfd3dc; }
-:deep(.el-tabs__item.is-active) { color: #409EFF; }
-:deep(.el-tabs__nav-wrap::after) { background-color: #333; }
+:deep(.el-tabs__item) {
+  color: #cfd3dc;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #409EFF;
+}
+
+:deep(.el-tabs__nav-wrap::after) {
+  background-color: #333;
+}
 </style>
