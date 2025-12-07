@@ -26,10 +26,7 @@
           <span>🖱️ 右键平移</span>
           <span>🖱️ 悬停高亮 / 点击查看</span>
         </div>
-        <el-button :type="isRunning ? 'danger' : 'success'" size="small" @click="toggleSimulation">
-          {{ isRunning ? '⏸ 暂停作业' : '▶ 继续作业' }}
-        </el-button>
-      </div>
+        </div>
     </div>
 
     <div ref="threeContainer" class="three-canvas"></div>
@@ -43,8 +40,7 @@
       <div class="legend-item"><span class="block normal"></span> 正常 (Normal)</div>
       <div class="legend-item"><span class="block warning"></span> 积压 (Warning)</div>
       <div class="legend-item"><span class="block critical"></span> 爆仓 (Critical)</div>
-      <div class="legend-item"><span class="block agv"></span> AGV 机器人</div>
-    </div>
+      </div>
 
     <el-drawer
       v-model="drawerVisible"
@@ -100,7 +96,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Location } from '@element-plus/icons-vue'; // 引入图标
+import { Location } from '@element-plus/icons-vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { getDashboardHeatmap, getStorageDetail } from '@/api/warehouse';
@@ -110,34 +106,13 @@ const threeContainer = ref(null);
 const drawerVisible = ref(false);
 const selectedBin = ref(null);
 const loading = ref(true);
-const isRunning = ref(true);
 const currentZone = ref('A');
 
 let scene, camera, renderer, controls;
 let raycaster, mouse;
 let cubes = []; 
-let agvMesh; 
 let animationId;
 let intersectedObject = null; 
-
-const clock = new THREE.Clock();
-let accumulatedTime = 0; 
-
-// 路径定义
-const PATROLS = {
-  A: [
-    { x: 0, z: 10 }, { x: -6, z: 10 }, { x: -6, z: -8 }, 
-    { x: 6, z: -8 }, { x: 6, z: 10 }, { x: 0, z: 10 }
-  ],
-  B: [
-    { x: 0, z: 12 }, { x: 0, z: -10 }, { x: 4, z: -10 }, 
-    { x: 4, z: 12 }, { x: 0, z: 12 }
-  ]
-};
-
-let currentPathIndex = 0;
-let currentPath = PATROLS.A; 
-let moveProgress = 0; 
 
 const COLORS = {
   bg: 0x0b1120,
@@ -146,7 +121,6 @@ const COLORS = {
   normal: 0x3b82f6,
   warning: 0xeab308,
   critical: 0xef4444,
-  agv: 0x10b981,
   highlight: 0x666666 
 };
 
@@ -188,7 +162,7 @@ const initThree = () => {
   mouse = new THREE.Vector2();
 
   createFloor();
-  createAGV();
+  // AGV 创建逻辑已移除
 
   window.addEventListener('resize', onWindowResize);
   window.addEventListener('click', onMouseClick);
@@ -215,86 +189,6 @@ const createFloor = () => {
   plane.position.y = -0.01;
   plane.receiveShadow = true;
   scene.add(plane);
-};
-
-const createAGV = () => {
-  const group = new THREE.Group();
-
-  // 车身
-  const bodyGeo = new THREE.BoxGeometry(0.8, 0.3, 1.2);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: COLORS.agv, roughness: 0.4, metalness: 0.6 });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 0.25; 
-  body.castShadow = true;
-  group.add(body);
-
-  // 车头 (红灯)
-  const headGeo = new THREE.BoxGeometry(0.6, 0.15, 0.1);
-  const headMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  const head = new THREE.Mesh(headGeo, headMat);
-  head.position.set(0, 0.25, 0.6); 
-  group.add(head);
-
-  // 轮子
-  const wheelGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 16);
-  const wheelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
-  [[-0.4, 0.15, -0.4], [0.4, 0.15, -0.4], [-0.4, 0.15, 0.4], [0.4, 0.15, 0.4]].forEach(pos => {
-    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-    wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(...pos);
-    group.add(wheel);
-  });
-
-  agvMesh = group;
-  resetAGV();
-  scene.add(agvMesh);
-};
-
-const resetAGV = () => {
-  if (!agvMesh) return;
-  currentPath = PATROLS[currentZone.value]; 
-  currentPathIndex = 0;
-  moveProgress = 0;
-  
-  const start = currentPath[0];
-  agvMesh.position.set(start.x, 0, start.z);
-  
-  if (currentPath.length > 1) {
-    agvMesh.lookAt(currentPath[1].x, 0, currentPath[1].z);
-  }
-};
-
-const updateAGVPosition = (deltaTime) => {
-  if (!agvMesh || !currentPath || currentPath.length < 2) return;
-
-  const speed = 4.0; 
-  const p1 = currentPath[currentPathIndex];
-  const nextIndex = (currentPathIndex + 1) % currentPath.length; 
-  const p2 = currentPath[nextIndex];
-
-  const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.z - p1.z, 2));
-  
-  if (dist > 0) {
-    moveProgress += (speed * deltaTime) / dist;
-  } else {
-    moveProgress = 1; 
-  }
-
-  if (moveProgress >= 1) {
-    moveProgress = 0;
-    currentPathIndex = nextIndex;
-    agvMesh.position.set(p2.x, 0, p2.z);
-    
-    const nextNextIndex = (currentPathIndex + 1) % currentPath.length;
-    const p3 = currentPath[nextNextIndex];
-    agvMesh.lookAt(p3.x, 0, p3.z);
-  } else {
-    const currentX = p1.x + (p2.x - p1.x) * moveProgress;
-    const currentZ = p1.z + (p2.z - p1.z) * moveProgress;
-    
-    agvMesh.position.set(currentX, 0, currentZ);
-    agvMesh.lookAt(p2.x, 0, p2.z);
-  }
 };
 
 const loadDataAndBuild = async () => {
@@ -349,7 +243,6 @@ const loadDataAndBuild = async () => {
 
 const handleZoneChange = () => {
   drawerVisible.value = false;
-  resetAGV(); 
   loadDataAndBuild(); 
 };
 
@@ -377,18 +270,11 @@ const handleCubeClick = async (code) => {
   }
 };
 
-const toggleSimulation = () => {
-  isRunning.value = !isRunning.value;
-};
-
 const animate = () => {
   animationId = requestAnimationFrame(animate);
   controls.update();
 
-  const delta = clock.getDelta();
-  if (isRunning.value) {
-    updateAGVPosition(delta);
-  }
+  // AGV 移动逻辑已移除
 
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(cubes);
@@ -551,6 +437,7 @@ const jumpToInventory = (code) => { router.push(code ? { path: '/inventory/list'
     background: #ef4444;
 }
 
+/* agv 样式可以删除，也可以保留不影响 */
 .block.agv {
     background: #10b981;
 }

@@ -149,8 +149,8 @@ const resetSearch = () => {
 };
 
 const goDetail = (row) => {
-  // 注意：需要确保路由中有配置 /reports/:id
-  router.push(`/reports/${row.id}`);
+  // 核心修复：添加 /detail/ 路径段，匹配 router/index.js 中的配置
+  router.push(`/reports/detail/${row.id}`);
 };
 
 const handleExport = (row) => {
