@@ -8,13 +8,13 @@
             placeholder="商品编码 / 名称" 
             :prefix-icon="Search"
             clearable 
-            style="width: 220px"
+            style="width: 200px"
             @keyup.enter="handleSearch"
           />
         </el-form-item>
         
         <el-form-item label="物料分类">
-          <el-select v-model="searchForm.category" placeholder="全部分类" style="width: 150px" clearable>
+          <el-select v-model="searchForm.category" placeholder="全部分类" style="width: 140px" clearable>
             <el-option label="电子元器件" value="Electronics" />
             <el-option label="机械配件" value="Mechanical" />
             <el-option label="辅料耗材" value="Consumables" />
@@ -22,19 +22,29 @@
         </el-form-item>
 
         <el-form-item label="仓库">
-          <el-select v-model="searchForm.warehouse_id" placeholder="全部仓库" style="width: 150px" clearable>
+          <el-select v-model="searchForm.warehouse_id" placeholder="全部仓库" style="width: 140px" clearable>
             <el-option label="Zone A (电子区)" :value="1" />
             <el-option label="Zone B (五金区)" :value="2" />
           </el-select>
         </el-form-item>
 
+        <el-form-item label="快照日期">
+          <el-date-picker
+            v-model="searchForm.snapshot_date"
+            type="date"
+            placeholder="选择日期"
+            value-format="YYYY-MM-DD"
+            style="width: 160px"
+            @change="handleSearch"
+          />
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
           <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
-          
           <el-button-group class="ml-10">
-            <el-button type="success" :icon="Document" plain @click="handleExportExcel">导出 Excel</el-button>
-            <el-button type="danger" :icon="Download" plain @click="handleExportPDF">导出 PDF</el-button>
+            <el-button type="success" :icon="Document" plain @click="handleExportExcel">Excel</el-button>
+            <el-button type="danger" :icon="Download" plain @click="handleExportPDF">PDF</el-button>
           </el-button-group>
         </el-form-item>
       </el-form>
@@ -95,6 +105,8 @@
           </template>
         </el-table-column>
 
+        <el-table-column prop="snapshot_time" label="快照时间" width="170" align="center" show-overflow-tooltip />
+        
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" :icon="View" @click="viewDetail(row)">详情</el-button>
@@ -104,12 +116,14 @@
 
       <div class="pagination-container">
         <el-pagination
-          background
-          layout="total, prev, pager, next"
-          :total="total"
-          :page-size="searchForm.page_size"
           v-model:current-page="searchForm.page"
-          @current-change="loadData"
+          v-model:page-size="searchForm.page_size"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          background
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -121,12 +135,11 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Location, Download, Document } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import * as XLSX from 'xlsx'; // Excel 库
-import jsPDF from 'jspdf';     // PDF 库
-import autoTable from 'jspdf-autotable'; // PDF 表格插件
+import * as XLSX from 'xlsx'; 
+import jsPDF from 'jspdf';     
+import autoTable from 'jspdf-autotable'; 
 
-// 引入 API
-import { getInventoryList /*, exportInventoryData */ } from '@/api/inventory';
+import { getInventoryList } from '@/api/inventory';
 
 const router = useRouter();
 const loading = ref(false);
@@ -137,17 +150,16 @@ const searchForm = reactive({
   keyword: '',
   category: '',
   warehouse_id: '',
+  snapshot_date: '',
   page: 1,
   page_size: 10
 });
 
-// 辅助函数：ID转名称
 const getWarehouseName = (id) => {
   const map = { 1: 'Zone A (电子区)', 2: 'Zone B (五金区)' };
   return map[id] || `WH-${id}`;
 };
 
-// 加载数据列表
 const loadData = async () => {
   loading.value = true;
   try {
@@ -156,7 +168,8 @@ const loadData = async () => {
       page_size: searchForm.page_size,
       warehouse_id: searchForm.warehouse_id || undefined,
       goods_name: searchForm.keyword || undefined,
-      goods_type: searchForm.category || undefined
+      goods_type: searchForm.category || undefined,
+      snapshot_date: searchForm.snapshot_date || undefined
     };
 
     const res = await getInventoryList(params);
@@ -180,7 +193,22 @@ const resetSearch = () => {
   searchForm.keyword = '';
   searchForm.category = '';
   searchForm.warehouse_id = '';
+  searchForm.snapshot_date = '';
+  searchForm.page_size = 10; // 重置时也恢复默认每页数量
   handleSearch();
+};
+
+// ✅ 新增：处理每页条数变化
+const handleSizeChange = (val) => {
+  searchForm.page_size = val;
+  searchForm.page = 1; // 改变每页条数时，通常回到第一页，防止数据为空
+  loadData();
+};
+
+// ✅ 新增：处理翻页
+const handleCurrentChange = (val) => {
+  searchForm.page = val;
+  loadData();
 };
 
 const viewDetail = (row) => {
@@ -211,7 +239,8 @@ const handleExportExcel = async () => {
       '库位': item.storage_code || '-',
       '总库存': item.total_number,
       '可用库存': item.available_total_number,
-      '冻结库存': item.frozen_total_number
+      '冻结库存': item.frozen_total_number,
+      '快照时间': item.snapshot_time || '-'
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -228,7 +257,7 @@ const handleExportExcel = async () => {
 };
 
 /**
- * 导出 PDF (核心修改部分)
+ * 导出 PDF
  */
 const handleExportPDF = async () => {
   if (tableData.value.length === 0) {
@@ -241,61 +270,47 @@ const handleExportPDF = async () => {
   try {
     ElMessage.info('正在加载字体并生成 PDF...');
 
-    // 1. 读取 public/fonts/SimHei.ttf 字体文件
-    // 注意：这里的路径必须相对于 public 目录
     const response = await fetch('/fonts/SimHei.ttf');
     if (!response.ok) {
       throw new Error('字体文件加载失败，请检查 public/fonts/SimHei.ttf 是否存在');
     }
     const fontBuffer = await response.arrayBuffer();
-
-    // 2. 将字体添加到 jsPDF 虚拟文件系统
-    // addFileToVFS(文件名, Base64字符串)
-    // 这里我们将 ArrayBuffer 转为 Base64
     const fontBase64 = arrayBufferToBase64(fontBuffer);
-    doc.addFileToVFS('SimHei.ttf', fontBase64);
-
-    // 3. 注册字体 (字体名, 样式, 内部调用名)
-    doc.addFont('SimHei.ttf', 'SimHei', 'normal');
     
-    // 4. 设置当前字体
+    doc.addFileToVFS('SimHei.ttf', fontBase64);
+    doc.addFont('SimHei.ttf', 'SimHei', 'normal');
     doc.setFont('SimHei');
 
-    // 5. 准备表格数据
-    const tableColumn = ["商品编码", "商品名称", "类型", "仓库", "库位", "总库存", "可用", "冻结"];
+    const tableColumn = ["商品编码", "商品名称", "类型", "仓库", "总库存", "可用", "快照时间"];
     const tableRows = tableData.value.map(item => [
       item.goods_code,
       item.goods_name,
       item.goods_type || '-',
       getWarehouseName(item.warehouse_id),
-      item.storage_code || '-',
       String(item.total_number),
       String(item.available_total_number),
-      String(item.frozen_total_number)
+      item.snapshot_time || '-'
     ]);
 
-    // 6. 生成表格
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 20,
       styles: { 
-        font: 'SimHei', // 关键：指定表格内容使用我们刚才注册的字体
+        font: 'SimHei', 
         fontStyle: 'normal',
         fontSize: 10 
       },
       headStyles: {
-        fillColor: [64, 158, 255], // Element Plus Primary Color
-        font: 'SimHei', // 表头也要指定字体
+        fillColor: [64, 158, 255],
+        font: 'SimHei',
         textColor: 255
       }
     });
 
-    // 7. 添加标题
     doc.setFontSize(18);
     doc.text("库存清单报表", 14, 15);
 
-    // 8. 保存文件
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     doc.save(`库存清单_${dateStr}.pdf`);
     
@@ -307,7 +322,6 @@ const handleExportPDF = async () => {
   }
 };
 
-// 工具函数：ArrayBuffer 转 Base64
 const arrayBufferToBase64 = (buffer) => {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -326,16 +340,45 @@ onMounted(() => {
 <style scoped>
 .page-container { padding: 20px; box-sizing: border-box; }
 .mb-20 { margin-bottom: 20px; }
-.ml-10 { margin-left: 10px; } /* 新增间距样式 */
+.ml-10 { margin-left: 10px; }
 
 /* 搜索卡片样式 */
-.search-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-form-item__label) { color: #cfd3dc; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper) { 
+.search-card { 
+  background: #1d1e1f; 
+  border: 1px solid #333; 
+  display: flex;
+  align-items: center;
+  padding: 18px 20px 0 20px; 
+}
+
+/* Flex 布局优化 */
+.search-form {
+  display: flex;
+  flex-wrap: wrap; 
+  align-items: center;
+  width: 100%;
+  gap: 10px; 
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 18px; 
+  margin-right: 0; 
+}
+
+:deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
+:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) { 
   background-color: #262729; 
   box-shadow: 0 0 0 1px #4c4d4f inset;
+  color: #fff;
 }
 :deep(.el-input__inner) { color: #fff; }
+
+/* 按钮组容器 */
+.btn-wrapper {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+}
 
 /* 表格卡片样式 */
 .table-card { background: #1d1e1f; border: 1px solid #333; }
@@ -371,4 +414,7 @@ onMounted(() => {
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
 :deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
+/* 分页输入框样式适配 */
+:deep(.el-pagination__sizes .el-select .el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
+:deep(.el-pagination__editor.el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
 </style>
