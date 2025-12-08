@@ -3,9 +3,9 @@
     <el-card shadow="never" class="search-card mb-20">
       <el-form :inline="true" :model="filters" class="search-form">
         <el-form-item label="仓库">
-          <el-select v-model="filters.warehouse" placeholder="全部仓库" style="width: 160px" clearable>
-            <el-option label="Zone A (电子区)" value="A" />
-            <el-option label="Zone B (五金区)" value="B" />
+          <el-select v-model="filters.warehouse_id" placeholder="全部仓库" style="width: 160px" clearable>
+            <el-option label="Zone A (电子区)" :value="1" />
+            <el-option label="Zone B (五金区)" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item label="报告类型">
@@ -24,6 +24,7 @@
              range-separator="至" 
              start-placeholder="开始日期" 
              end-placeholder="结束日期" 
+             value-format="YYYY-MM-DD"
              style="width: 260px"
            />
         </el-form-item>
@@ -35,14 +36,22 @@
     </el-card>
 
     <el-card shadow="never" class="list-card">
-      <el-table :data="reportList" style="width: 100%" class="custom-table" border>
-        <el-table-column prop="id" label="报告ID" width="140" fixed show-overflow-tooltip />
+      <el-table 
+        :data="reportList" 
+        style="width: 100%" 
+        class="custom-table" 
+        border 
+        v-loading="loading"
+      >
+        <el-table-column prop="report_id" label="报告ID" width="100" fixed show-overflow-tooltip />
         
-        <el-table-column prop="reportCode" label="报告编号" width="160" show-overflow-tooltip />
+        <el-table-column prop="report_code" label="报告编号" width="160" show-overflow-tooltip />
 
-        <el-table-column prop="type" label="类型" width="120" align="center">
+        <el-table-column prop="report_type" label="类型" width="120" align="center">
            <template #default="{ row }">
-              <el-tag :type="getReportTypeTag(row.type)" effect="dark" size="small">{{ getReportTypeLabel(row.type) }}</el-tag>
+              <el-tag :type="getReportTypeTag(row.report_type)" effect="dark" size="small">
+                {{ getReportTypeLabel(row.report_type) }}
+              </el-tag>
            </template>
         </el-table-column>
 
@@ -51,75 +60,64 @@
         <el-table-column prop="status" label="状态" width="100" align="center">
            <template #default="{ row }">
               <el-tag size="small" :type="row.status === 'COMPLETED' ? 'success' : 'info'" effect="plain">
-                {{ row.status === 'COMPLETED' ? '已生成' : '生成中' }}
+                {{ row.status === 'COMPLETED' ? '已生成' : (row.status || '生成中') }}
               </el-tag>
            </template>
         </el-table-column>
 
-        <el-table-column prop="createTime" label="创建时间" width="180" align="center" />
+        <el-table-column prop="created_at" label="创建时间" width="180" align="center" />
         
         <el-table-column label="操作" width="180" fixed="right" align="center">
            <template #default="{ row }">
               <el-button link type="primary" :icon="View" @click="goDetail(row)">查看</el-button>
-              <el-button link type="primary" :icon="Download" @click="handleExport(row)">导出</el-button>
+              <el-button 
+                link 
+                type="primary" 
+                :icon="Download" 
+                @click="handleExport(row)"
+                :loading="row.downloading"
+              >
+                下载
+              </el-button>
            </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-container mt-20" style="display:flex; justify-content:flex-end; padding-top:10px;">
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :total="total"
+          :page-size="filters.page_size"
+          v-model:current-page="filters.page"
+          @current-change="loadData"
+        />
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Download } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import { getReportList, exportReport } from '@/api/report';
+import { downloadFileFromUrl } from '@/utils/exportReport'; // 引入下载工具
 
 const router = useRouter();
+const loading = ref(false);
+const total = ref(0);
+const reportList = ref([]);
 
 const filters = reactive({
-  warehouse: '',
+  warehouse_id: '',
   type: '',
-  dateRange: []
+  dateRange: [],
+  page: 1,
+  page_size: 10
 });
 
-// 模拟数据 (Strict Mode: 严格对应字段)
-const reportList = reactive([
-  { 
-    id: 'RPT-1001', 
-    reportCode: '20240501-D-A', 
-    title: '5月1日 Zone A 运营日报', 
-    type: 'DAILY', 
-    status: 'COMPLETED',
-    createTime: '2024-05-01 18:00:00' 
-  },
-  { 
-    id: 'RPT-1002', 
-    reportCode: '202404-M-ALL', 
-    title: '4月份全仓运营月报', 
-    type: 'MONTHLY', 
-    status: 'COMPLETED',
-    createTime: '2024-05-01 09:00:00' 
-  },
-  { 
-    id: 'RPT-1003', 
-    reportCode: 'OPT-20240430-B', 
-    title: 'Zone B 空间优化专项报告', 
-    type: 'OPTIMIZATION', 
-    status: 'COMPLETED',
-    createTime: '2024-04-30 14:20:00' 
-  },
-  { 
-    id: 'RPT-1004', 
-    reportCode: 'REP-20240428-A', 
-    title: 'Zone A 紧急补货建议书', 
-    type: 'REPLENISHMENT', 
-    status: 'COMPLETED',
-    createTime: '2024-04-28 09:15:00' 
-  },
-]);
-
-// 类型映射
 const getReportTypeLabel = (type) => {
   const map = { 
     'DAILY': '运营日报', 
@@ -138,34 +136,88 @@ const getReportTypeTag = (type) => {
   return 'info';
 };
 
+const loadData = async () => {
+  loading.value = true;
+  try {
+    let start_date, end_date;
+    if (filters.dateRange && filters.dateRange.length === 2) {
+      start_date = filters.dateRange[0];
+      end_date = filters.dateRange[1];
+    }
+
+    const params = {
+      page: filters.page,
+      page_size: filters.page_size,
+      type: filters.type || undefined,
+      start_date,
+      end_date
+      // warehouse_id: filters.warehouse_id // 暂不传，API文档未列出
+    };
+
+    const res = await getReportList(params);
+    if (res.code === 200) {
+      // 为每一行添加 downloading 状态，防止重复点击
+      reportList.value = res.data.items.map(item => ({
+        ...item,
+        downloading: false
+      }));
+      total.value = res.data.total;
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    loading.value = false;
+  }
+};
+
 const handleSearch = () => {
-  ElMessage.success('查询已触发');
+  filters.page = 1;
+  loadData();
 };
 
 const resetSearch = () => {
-  filters.warehouse = '';
+  filters.warehouse_id = '';
   filters.type = '';
   filters.dateRange = [];
+  handleSearch();
 };
 
 const goDetail = (row) => {
-  // 核心修复：添加 /detail/ 路径段，匹配 router/index.js 中的配置
-  router.push(`/reports/detail/${row.id}`);
+  router.push(`/reports/detail/${row.report_id}`);
 };
 
-const handleExport = (row) => {
-  ElMessage.success(`正在导出报告: ${row.reportCode}`);
+// ✅ 核心功能：调用后端接口下载
+const handleExport = async (row) => {
+  if (row.downloading) return;
+  row.downloading = true; // 开启 loading
+
+  try {
+    ElMessage.info('正在请求下载链接...');
+    // 默认请求 PDF 格式，如果需要 Excel 可以传 'EXCEL'
+    const res = await exportReport(row.report_id, 'PDF');
+    
+    if (res.code === 200 && res.data && res.data.download_url) {
+      downloadFileFromUrl(res.data.download_url);
+    } else {
+      ElMessage.warning('后端未返回有效的下载链接');
+    }
+  } catch (error) {
+    console.error('下载失败:', error);
+    ElMessage.error('导出请求失败');
+  } finally {
+    row.downloading = false; // 关闭 loading
+  }
 };
+
+onMounted(() => {
+  loadData();
+});
 </script>
 
 <style scoped>
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
-
-/* 搜索卡片 */
 .search-card { background: #1d1e1f; border: 1px solid #333; }
-
-/* 暗黑输入框适配 */
 :deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
 :deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) {
   background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff;
@@ -173,11 +225,7 @@ const handleExport = (row) => {
 :deep(.el-input__inner) { color: #fff; }
 :deep(.el-range-input) { color: #fff; background: transparent; }
 :deep(.el-range-separator) { color: #909399; }
-
-/* 列表卡片 */
 .list-card { background: #1d1e1f; border: 1px solid #333; }
-
-/* 表格样式 */
 :deep(.el-table) {
   background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333;
   --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
@@ -188,4 +236,7 @@ const handleExport = (row) => {
   border-right: 1px solid #333 !important;
 }
 :deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
+:deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
+:deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
 </style>
