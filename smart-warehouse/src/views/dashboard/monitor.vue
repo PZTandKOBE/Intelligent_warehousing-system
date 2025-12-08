@@ -2,7 +2,7 @@
   <div class="monitor-container">
     <div class="monitor-header">
       <div class="left">
-        <h2>🧊 3D 仓库数字孪生 (Digital Twin)</h2>
+        <h2>🧊 3D 仓库数字孪生</h2>
         <el-select 
           v-model="currentZoneId" 
           placeholder="切换库区" 
