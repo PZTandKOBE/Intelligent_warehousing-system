@@ -21,6 +21,7 @@
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
           <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+          <el-button type="warning" :icon="Setting" plain @click="openConfigDialog">预测配置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -98,21 +99,106 @@
         />
       </div>
     </el-card>
+
+    <el-dialog
+      v-model="configDialogVisible"
+      title="⚙️ 补货预测策略配置"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="config-container">
+        <div class="mb-20 flex justify-between">
+          <el-alert 
+            title="关闭预测的商品将不再生成补货建议" 
+            type="warning" 
+            effect="dark"
+            show-icon 
+            :closable="false"
+            style="margin-bottom: 15px;"
+          />
+          <el-form :inline="true" :model="configFilters" class="search-form">
+            <el-form-item>
+              <el-input 
+                v-model="configFilters.keyword" 
+                placeholder="商品名称/编码" 
+                :prefix-icon="Search" 
+                clearable 
+                @keyup.enter="loadConfigList"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-select v-model="configFilters.warehouse_id" placeholder="仓库" style="width: 120px" clearable @change="loadConfigList">
+                <el-option label="Zone A" :value="1" />
+                <el-option label="Zone B" :value="2" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadConfigList">搜索</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <el-table 
+          :data="configTableData" 
+          v-loading="configLoading" 
+          border 
+          height="400"
+          style="width: 100%;margin-bottom: 20px;"
+        >
+          <el-table-column prop="goods_code" label="商品编码" width="140" />
+          <el-table-column prop="goods_name" label="商品名称" min-width="150" />
+          <el-table-column label="所属仓库" width="120" align="center">
+            <template #default="{ row }">
+              {{ getWarehouseName(row.warehouse_id) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="是否参与预测" width="150" align="center">
+            <template #default="{ row }">
+              <el-switch
+                v-model="row.enabled"
+                inline-prompt
+                active-text="开启"
+                inactive-text="关闭"
+                :loading="row.switching"
+                @change="handleConfigChange(row)"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-container mt-20" style="display:flex; justify-content:flex-end;">
+          <el-pagination
+            small
+            background
+            layout="prev, pager, next"
+            :total="configTotal"
+            :page-size="configFilters.page_size"
+            v-model:current-page="configFilters.page"
+            @current-change="loadConfigList"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button type="primary" @click="configDialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Search, Refresh, View } from '@element-plus/icons-vue';
-import { getReplenishmentList } from '@/api/replenishment';
+import { Search, Refresh, View, Setting } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
+import { getReplenishmentList, getReplenishmentConfigList, updateReplenishmentConfig } from '@/api/replenishment';
 
 const router = useRouter();
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref([]);
 
-// 筛选数据
 const filters = reactive({
   warehouse_id: '',
   goods_id: '',
@@ -120,6 +206,61 @@ const filters = reactive({
   page: 1,
   page_size: 10
 });
+
+const configDialogVisible = ref(false);
+const configLoading = ref(false);
+const configTotal = ref(0);
+const configTableData = ref([]);
+const configFilters = reactive({
+  keyword: '',
+  warehouse_id: '',
+  page: 1,
+  page_size: 10
+});
+
+const openConfigDialog = () => {
+  configDialogVisible.value = true;
+  loadConfigList();
+};
+
+const loadConfigList = async () => {
+  configLoading.value = true;
+  try {
+    // 模拟数据
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const mockData = Array.from({ length: 10 }).map((_, idx) => ({
+      id: idx,
+      goods_code: `MAT-CONFIG-${1000 + idx}`,
+      goods_name: `模拟商品 ${idx + 1}`,
+      warehouse_id: idx % 2 === 0 ? 1 : 2,
+      enabled: idx % 3 !== 0,
+      switching: false
+    }));
+    
+    configTableData.value = mockData;
+    configTotal.value = 50; 
+  } catch (error) {
+    console.error(error);
+    ElMessage.error('加载配置列表失败');
+  } finally {
+    configLoading.value = false;
+  }
+};
+
+const handleConfigChange = async (row) => {
+  row.switching = true;
+  try {
+    // 模拟请求成功
+    await new Promise(resolve => setTimeout(resolve, 600));
+    ElMessage.success(`${row.goods_name} 预测功能已${row.enabled ? '开启' : '关闭'}`);
+  } catch (error) {
+    console.error(error);
+    row.enabled = !row.enabled; 
+    ElMessage.error('设置失败，请稍后重试');
+  } finally {
+    row.switching = false;
+  }
+};
 
 const getWarehouseName = (id) => {
   const map = { 1: 'Zone A', 2: 'Zone B' };
@@ -177,7 +318,6 @@ const resetSearch = () => {
 };
 
 const goDetail = (row) => {
-  // 注意：使用 recommendation_id
   router.push(`/replenishment/recommendations/${row.recommendation_id}`);
 };
 
@@ -219,4 +359,9 @@ onMounted(() => {
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
 :deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
+
+/* 弹窗样式补充 */
+:deep(.el-dialog) { background-color: #1d1e1f; border: 1px solid #333; }
+:deep(.el-dialog__title) { color: #fff; }
+:deep(.el-dialog__body) { padding-top: 10px; }
 </style>
