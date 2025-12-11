@@ -17,7 +17,7 @@ export function getReplenishmentList(params) {
  */
 export function getReplenishmentReport(id) {
   return request({
-    url: `/api/v1/replenishment/recommendations/${id}/report`,
+    url: `/api/v1/replenishment/recommendation/${id}/report`,
     method: 'get'
   })
 }
