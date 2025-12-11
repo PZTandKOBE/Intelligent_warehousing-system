@@ -3,9 +3,18 @@
     <el-card shadow="never" class="search-card mb-20">
       <el-form :inline="true" :model="filters" class="search-form">
         <el-form-item label="仓库">
-          <el-select v-model="filters.warehouse_id" placeholder="全部仓库" style="width: 160px" clearable>
-            <el-option label="Zone A (电子区)" :value="1" />
-            <el-option label="Zone B (五金区)" :value="2" />
+          <el-select 
+            v-model="filters.warehouse_id" 
+            placeholder="全部仓库" 
+            style="width: 160px" 
+            clearable
+          >
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -89,10 +98,13 @@ import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Download } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getOptimizationPlans, getOptimizationPlanReport } from '@/api/optimization';
-import { exportReport } from '@/api/report'; // 复用 Report 模块的导出接口
-import { downloadFileFromUrl } from '@/utils/exportReport'; // 工具函数
+import { exportReport } from '@/api/report'; 
+import { downloadFileFromUrl } from '@/utils/exportReport'; 
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
 const router = useRouter();
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+
 const loading = ref(false);
 const total = ref(0);
 const planList = ref([]);
@@ -104,9 +116,10 @@ const filters = reactive({
   page_size: 10
 });
 
+// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A', 2: 'Zone B' };
-  return map[id] || `WH-${id}`;
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const getOptimizationTypeLabel = (type) => {
@@ -168,12 +181,9 @@ const goDetail = (row) => {
   router.push(`/optimization/plans/${row.plan_id}`);
 };
 
-// ✅ 核心逻辑：获取 report_id 并导出
 const handleExport = async (row) => {
   try {
     ElMessage.info('正在获取方案报告...');
-    
-    // 1. 先调用详情接口，获取关联的 report_id
     const detailRes = await getOptimizationPlanReport(row.plan_id);
     
     if (detailRes.code !== 200 || !detailRes.data.report || !detailRes.data.report.report_id) {
@@ -182,8 +192,6 @@ const handleExport = async (row) => {
     }
 
     const reportId = detailRes.data.report.report_id;
-
-    // 2. 调用导出接口
     ElMessage.info('正在请求下载链接...');
     const exportRes = await exportReport(reportId, 'PDF');
     
@@ -200,11 +208,14 @@ const handleExport = async (row) => {
 };
 
 onMounted(() => {
+  // ✅ 加载仓库
+  warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .search-card { background: #1d1e1f; border: 1px solid #333; }

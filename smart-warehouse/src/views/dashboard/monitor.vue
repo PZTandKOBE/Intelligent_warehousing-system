@@ -5,7 +5,7 @@
         <h2>🧊 3D 仓库数字孪生</h2>
         <el-select 
           v-model="currentZoneId" 
-          placeholder="切换库区" 
+          placeholder="请选择仓库" 
           size="default" 
           class="zone-select ml-10"
           @change="handleZoneChange"
@@ -13,8 +13,12 @@
           <template #prefix>
             <el-icon><Location /></el-icon>
           </template>
-          <el-option label="Zone A - 电子元器件区" :value="1" />
-          <el-option label="Zone B - 五金配件区" :value="2" />
+          <el-option 
+            v-for="item in warehouseStore.warehouseList"
+            :key="item.warehouse_id"
+            :label="item.warehouse_name"
+            :value="item.warehouse_id"
+          />
         </el-select>
       </div>
 
@@ -52,7 +56,7 @@
         <div class="info-grid">
           <div class="info-item">
             <span class="label">坐标位置</span>
-            <span class="value">[ {{ selectedBin.coordinate.join(', ') }} ]</span>
+            <span class="value">[ {{ selectedBin.coordinate ? selectedBin.coordinate.join(', ') : '-' }} ]</span>
           </div>
           <div class="info-item">
             <span class="label">库存价值</span>
@@ -76,13 +80,16 @@ import { Location } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { getDashboardHeatmap } from '@/api/dashboard';
+import { getDashboardHeatmap } from '@/api/warehouse'; // ✅ 引入新 API
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
 const threeContainer = ref(null);
 const drawerVisible = ref(false);
 const selectedBin = ref(null);
-const loading = ref(true);
-const currentZoneId = ref(1);
+const loading = ref(false);
+
+const warehouseStore = useWarehouseStore();
+const currentZoneId = ref(null);
 
 let scene, camera, renderer, controls;
 let raycaster, mouse;
@@ -101,6 +108,7 @@ const COLORS = {
   hoverEmissive: 0x444444 
 };
 
+// --- Three.js 初始化逻辑 (完整) ---
 const initThree = () => {
   if (!threeContainer.value) return;
   const width = threeContainer.value.clientWidth;
@@ -110,7 +118,6 @@ const initThree = () => {
   scene.background = new THREE.Color(COLORS.bg);
   scene.fog = new THREE.Fog(COLORS.bg, 80, 300);
 
-  // 视角：保持 40 度，位置适中
   camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
   camera.position.set(50, 60, 80);
 
@@ -174,13 +181,13 @@ const createFloor = () => {
   scene.add(plane);
 };
 
+// --- 数据加载与构建 ---
 const loadDataAndBuild = async () => {
+  if (!currentZoneId.value) return;
+
   loading.value = true;
   try {
-    const res = await getDashboardHeatmap({ 
-      warehouse_id: currentZoneId.value,
-      type: 'inventory_value' 
-    });
+    const res = await getDashboardHeatmap(currentZoneId.value);
 
     cubes.forEach(cube => scene.remove(cube));
     cubes = [];
@@ -189,19 +196,8 @@ const loadDataAndBuild = async () => {
       const points = res.data.points;
       
       const boxSize = 1.0; 
-      
-      // === ⚡️ 间隙核心调整区 ⚡️ ===
-      
-      // 1. 同排内间隙 (Z轴): 1.0 
-      // 没有任何缝隙，方块紧挨着方块，连成一条线
       const binSpacing = 1.0; 
-      
-      // 2. 排与排间隙 (X轴): 1.2
-      // 这是一个很小的过道，刚好把货架分开，但看起来非常紧凑
       const rackSpacing = 1.1; 
-      
-      // 3. 上下间隙 (Y轴): 0.8
-      // 垂直方向压缩，无缝堆叠
       const levelSpacing = 0.2; 
 
       const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
@@ -219,7 +215,6 @@ const loadDataAndBuild = async () => {
         if (layer < minLayer) minLayer = layer;
       });
 
-      // 计算中心偏移
       const totalWidthX = (maxX - minX) * rackSpacing;
       const totalDepthZ = (maxZ - minZ) * binSpacing;
       
@@ -240,19 +235,12 @@ const loadDataAndBuild = async () => {
         });
         
         const cube = new THREE.Mesh(geometry, material);
-
-        // 应用排间距
         const posX = row * rackSpacing - centerOffsetX;
-        
-        // 应用列间距 (紧密)
         const posZ = col * binSpacing - centerOffsetZ;
-        
-        // 应用垂直间距
         const normalizedLayer = layer - minLayer; 
         const posY = normalizedLayer * levelSpacing + (boxSize / 2);
 
         cube.position.set(posX, posY, posZ);
-        
         cube.castShadow = true;
         cube.receiveShadow = true;
         cube.userData = { ...point, originalHex: color }; 
@@ -261,12 +249,10 @@ const loadDataAndBuild = async () => {
         cubes.push(cube);
       });
 
-      // 自动聚焦
       fitCameraToSelection(camera, controls, cubes, 0.8); 
-
-      ElMessage.success(`渲染完成: ${points.length} 单元`);
+      ElMessage.success(`数据同步完成: ${points.length} 单元`);
     } else {
-      ElMessage.warning('暂无数据');
+      ElMessage.warning('当前仓库暂无库存数据');
     }
   } catch (error) {
     console.error(error);
@@ -305,6 +291,7 @@ const handleZoneChange = () => {
 };
 
 const onMouseMove = (event) => {
+  if (!threeContainer.value) return;
   const rect = threeContainer.value.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -326,7 +313,6 @@ const animate = () => {
 
   if (intersects.length > 0) {
     const currentObject = intersects[0].object;
-    
     if (intersectedObject !== currentObject) {
       if (intersectedObject) {
         intersectedObject.material.color.setHex(intersectedObject.userData.originalHex);
@@ -346,7 +332,6 @@ const animate = () => {
       intersectedObject = null;
     }
   }
-
   renderer.render(scene, camera);
 };
 
@@ -363,9 +348,17 @@ const getStatusType = (val) => val > 20000 ? 'danger' : (val > 5000 ? 'warning' 
 const getStatusText = (val) => val > 20000 ? '爆仓' : (val > 5000 ? '积压' : '正常');
 const getStatusColor = (val) => val > 20000 ? '#F56C6C' : (val > 5000 ? '#E6A23C' : '#67C23A');
 
-onMounted(() => {
+onMounted(async () => {
   initThree();
-  loadDataAndBuild();
+  
+  // ✅ 获取仓库列表
+  await warehouseStore.fetchWarehouses();
+
+  // ✅ 默认选中第一个
+  if (warehouseStore.warehouseList.length > 0) {
+    currentZoneId.value = warehouseStore.warehouseList[0].warehouse_id;
+    loadDataAndBuild();
+  }
 });
 
 onBeforeUnmount(() => {

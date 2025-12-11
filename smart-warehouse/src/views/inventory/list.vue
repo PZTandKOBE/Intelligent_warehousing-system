@@ -22,9 +22,18 @@
         </el-form-item>
 
         <el-form-item label="仓库">
-          <el-select v-model="searchForm.warehouse_id" placeholder="全部仓库" style="width: 140px" clearable>
-            <el-option label="Zone A (电子区)" :value="1" />
-            <el-option label="Zone B (五金区)" :value="2" />
+          <el-select 
+            v-model="searchForm.warehouse_id" 
+            placeholder="全部仓库" 
+            style="width: 140px" 
+            clearable
+          >
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
 
@@ -138,10 +147,12 @@ import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx'; 
 import jsPDF from 'jspdf';     
 import autoTable from 'jspdf-autotable'; 
-
 import { getInventoryList } from '@/api/inventory';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
 const router = useRouter();
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref([]);
@@ -155,9 +166,10 @@ const searchForm = reactive({
   page_size: 10
 });
 
+// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A (电子区)', 2: 'Zone B (五金区)' };
-  return map[id] || `WH-${id}`;
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const loadData = async () => {
@@ -194,18 +206,16 @@ const resetSearch = () => {
   searchForm.category = '';
   searchForm.warehouse_id = '';
   searchForm.snapshot_date = '';
-  searchForm.page_size = 10; // 重置时也恢复默认每页数量
+  searchForm.page_size = 10;
   handleSearch();
 };
 
-// ✅ 新增：处理每页条数变化
 const handleSizeChange = (val) => {
   searchForm.page_size = val;
-  searchForm.page = 1; // 改变每页条数时，通常回到第一页，防止数据为空
+  searchForm.page = 1;
   loadData();
 };
 
-// ✅ 新增：处理翻页
 const handleCurrentChange = (val) => {
   searchForm.page = val;
   loadData();
@@ -220,15 +230,11 @@ const viewDetail = (row) => {
   router.push(`/inventory/detail/${id}`);
 };
 
-/**
- * 导出 Excel
- */
 const handleExportExcel = async () => {
   if (tableData.value.length === 0) {
     ElMessage.warning('当前暂无数据可导出');
     return;
   }
-
   try {
     ElMessage.info('正在生成 Excel 文件...');
     const exportData = tableData.value.map(item => ({
@@ -256,20 +262,14 @@ const handleExportExcel = async () => {
   }
 };
 
-/**
- * 导出 PDF
- */
 const handleExportPDF = async () => {
   if (tableData.value.length === 0) {
     ElMessage.warning('当前暂无数据可导出');
     return;
   }
-
   const doc = new jsPDF();
-
   try {
     ElMessage.info('正在加载字体并生成 PDF...');
-
     const response = await fetch('/fonts/SimHei.ttf');
     if (!response.ok) {
       throw new Error('字体文件加载失败，请检查 public/fonts/SimHei.ttf 是否存在');
@@ -296,26 +296,15 @@ const handleExportPDF = async () => {
       head: [tableColumn],
       body: tableRows,
       startY: 20,
-      styles: { 
-        font: 'SimHei', 
-        fontStyle: 'normal',
-        fontSize: 10 
-      },
-      headStyles: {
-        fillColor: [64, 158, 255],
-        font: 'SimHei',
-        textColor: 255
-      }
+      styles: { font: 'SimHei', fontStyle: 'normal', fontSize: 10 },
+      headStyles: { fillColor: [64, 158, 255], font: 'SimHei', textColor: 255 }
     });
 
     doc.setFontSize(18);
     doc.text("库存清单报表", 14, 15);
-
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     doc.save(`库存清单_${dateStr}.pdf`);
-    
     ElMessage.success('PDF 导出成功');
-
   } catch (error) {
     console.error('PDF 导出失败:', error);
     ElMessage.error('PDF 导出失败：' + error.message);
@@ -333,73 +322,34 @@ const arrayBufferToBase64 = (buffer) => {
 };
 
 onMounted(() => {
+  // ✅ 加载仓库
+  warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .page-container { padding: 20px; box-sizing: border-box; }
 .mb-20 { margin-bottom: 20px; }
 .ml-10 { margin-left: 10px; }
-
-/* 搜索卡片样式 */
-.search-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  display: flex;
-  align-items: center;
-  padding: 18px 20px 0 20px; 
-}
-
-/* Flex 布局优化 */
-.search-form {
-  display: flex;
-  flex-wrap: wrap; 
-  align-items: center;
-  width: 100%;
-  gap: 10px; 
-}
-
-:deep(.el-form-item) {
-  margin-bottom: 18px; 
-  margin-right: 0; 
-}
-
+.search-card { background: #1d1e1f; border: 1px solid #333; display: flex; align-items: center; padding: 18px 20px 0 20px; }
+.search-form { display: flex; flex-wrap: wrap; align-items: center; width: 100%; gap: 10px; }
+:deep(.el-form-item) { margin-bottom: 18px; margin-right: 0; }
 :deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
 :deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) { 
-  background-color: #262729; 
-  box-shadow: 0 0 0 1px #4c4d4f inset;
-  color: #fff;
+  background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff;
 }
 :deep(.el-input__inner) { color: #fff; }
-
-/* 按钮组容器 */
-.btn-wrapper {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-}
-
-/* 表格卡片样式 */
 .table-card { background: #1d1e1f; border: 1px solid #333; }
-
 :deep(.el-table) {
-  --el-table-border-color: #333;
-  --el-table-header-bg-color: #262729;
-  --el-table-row-hover-bg-color: #2c3e50;
-  background-color: transparent !important;
-  color: #cfd3dc;
+  --el-table-border-color: #333; --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
+  background-color: transparent !important; color: #cfd3dc;
 }
 :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; 
-  border-bottom: 1px solid #333 !important;
-  border-right: 1px solid #333 !important;
+  background-color: transparent !important; border-bottom: 1px solid #333 !important; border-right: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { 
-  background-color: #262729 !important; 
-  color: #fff; 
-  font-weight: bold;
-}
+:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
 .text-success { color: #67C23A; }
 .text-warning { color: #E6A23C; }
 .text-gray { color: #5c5c5c; }
@@ -408,13 +358,10 @@ onMounted(() => {
 .link-text:hover { color: #79bbff; }
 .link-text-sub { cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .link-text-sub:hover { color: #409EFF; }
-
-/* 分页样式 */
 .pagination-container { display: flex; justify-content: flex-end; margin-top: 20px; }
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
 :deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
-/* 分页输入框样式适配 */
 :deep(.el-pagination__sizes .el-select .el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
 :deep(.el-pagination__editor.el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
 </style>

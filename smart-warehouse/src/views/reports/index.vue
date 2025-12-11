@@ -3,9 +3,18 @@
     <el-card shadow="never" class="search-card mb-20">
       <el-form :inline="true" :model="filters" class="search-form">
         <el-form-item label="仓库">
-          <el-select v-model="filters.warehouse_id" placeholder="全部仓库" style="width: 160px" clearable>
-            <el-option label="Zone A (电子区)" :value="1" />
-            <el-option label="Zone B (五金区)" :value="2" />
+          <el-select 
+            v-model="filters.warehouse_id" 
+            placeholder="全部仓库" 
+            style="width: 160px" 
+            clearable
+          >
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="报告类型">
@@ -103,9 +112,12 @@ import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Download } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getReportList, exportReport } from '@/api/report';
-import { downloadFileFromUrl } from '@/utils/exportReport'; // 引入下载工具
+import { downloadFileFromUrl } from '@/utils/exportReport';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
 const router = useRouter();
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+
 const loading = ref(false);
 const total = ref(0);
 const reportList = ref([]);
@@ -151,12 +163,11 @@ const loadData = async () => {
       type: filters.type || undefined,
       start_date,
       end_date
-      // warehouse_id: filters.warehouse_id // 暂不传，API文档未列出
+      // warehouse_id: filters.warehouse_id // 如后端支持则可解开注释
     };
 
     const res = await getReportList(params);
     if (res.code === 200) {
-      // 为每一行添加 downloading 状态，防止重复点击
       reportList.value = res.data.items.map(item => ({
         ...item,
         downloading: false
@@ -186,14 +197,12 @@ const goDetail = (row) => {
   router.push(`/reports/detail/${row.report_id}`);
 };
 
-// ✅ 核心功能：调用后端接口下载
 const handleExport = async (row) => {
   if (row.downloading) return;
-  row.downloading = true; // 开启 loading
+  row.downloading = true;
 
   try {
     ElMessage.info('正在请求下载链接...');
-    // 默认请求 PDF 格式，如果需要 Excel 可以传 'EXCEL'
     const res = await exportReport(row.report_id, 'PDF');
     
     if (res.code === 200 && res.data && res.data.download_url) {
@@ -205,16 +214,19 @@ const handleExport = async (row) => {
     console.error('下载失败:', error);
     ElMessage.error('导出请求失败');
   } finally {
-    row.downloading = false; // 关闭 loading
+    row.downloading = false;
   }
 };
 
 onMounted(() => {
+  // ✅ 加载仓库
+  warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .search-card { background: #1d1e1f; border: 1px solid #333; }

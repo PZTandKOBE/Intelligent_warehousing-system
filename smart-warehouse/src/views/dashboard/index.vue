@@ -3,10 +3,20 @@
     <div class="header-controls">
       <div class="left-controls">
         <h2 class="page-title">📊 运营数据概览</h2>
-        <el-select v-model="warehouseId" placeholder="选择仓库" size="default" style="width: 160px; margin-left: 20px;"
-          @change="handleFilterChange" clearable>
-          <el-option label="Zone A (电子区)" :value="1" />
-          <el-option label="Zone B (五金区)" :value="2" />
+        <el-select 
+          v-model="warehouseId" 
+          placeholder="选择仓库" 
+          size="default" 
+          style="width: 160px; margin-left: 20px;"
+          @change="handleFilterChange" 
+          clearable
+        >
+          <el-option 
+            v-for="item in warehouseStore.warehouseList"
+            :key="item.warehouse_id"
+            :label="item.warehouse_name"
+            :value="item.warehouse_id"
+          />
         </el-select>
       </div>
 
@@ -110,14 +120,16 @@ import { ref, reactive, onMounted } from 'vue';
 import { InfoFilled } from '@element-plus/icons-vue';
 import BaseChart from '@/components/BaseChart.vue';
 import { getDashboardKPI, getDashboardCharts } from '@/api/dashboard';
-import { ElMessage } from 'element-plus';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
 
 // --- 状态定义 ---
 const warehouseId = ref(null); // 默认全部
 const period = ref('7d');
 const loadingCharts = ref(false);
 
-// KPI 数据对象 (对应后端字段)
+// KPI 数据对象
 const kpiData = ref({
   total_inventory_value: 0,
   stagnant_materials_count: 0,
@@ -126,7 +138,6 @@ const kpiData = ref({
   optimization_task_progress: 0
 });
 
-// 进度条颜色
 const progressColors = [
   { color: '#67C23A', percentage: 60 },
   { color: '#E6A23C', percentage: 80 },
@@ -143,7 +154,6 @@ const formatNumber = (num) => {
   return num ? num.toLocaleString() : '0';
 };
 
-// --- 图表 Options ---
 const amountTrendOptions = reactive({
   backgroundColor: 'transparent',
   tooltip: { trigger: 'axis' },
@@ -171,7 +181,6 @@ const inOutBarOptions = reactive({
 
 // --- 数据请求 ---
 const fetchData = async () => {
-  // 1. 获取 KPI
   try {
     const kpiRes = await getDashboardKPI({ warehouse_id: warehouseId.value });
     if (kpiRes.code === 200) {
@@ -181,10 +190,8 @@ const fetchData = async () => {
     console.error(err);
   }
 
-  // 2. 获取图表
   loadingCharts.value = true;
   try {
-    // 2.1 库存趋势图
     const trendRes = await getDashboardCharts({
       type: 'inventory_trend',
       period: period.value,
@@ -195,19 +202,15 @@ const fetchData = async () => {
       amountTrendOptions.series[0].data = trendRes.data.data.map(i => i.value);
     }
 
-    // 2.2 出入库对比 (并行请求)
-    // 尝试请求 'inbound' 和 'outbound' 类型，如果后端不支持这两个类型，图表将为空
     const [inRes, outRes] = await Promise.all([
       getDashboardCharts({ type: 'inbound', period: period.value, warehouse_id: warehouseId.value }),
       getDashboardCharts({ type: 'outbound', period: period.value, warehouse_id: warehouseId.value })
     ]);
 
-    // 处理入库
     if (inRes.code === 200 && inRes.data.data) {
-      inOutBarOptions.xAxis.data = inRes.data.data.map(i => i.date); // 以入库日期为轴
+      inOutBarOptions.xAxis.data = inRes.data.data.map(i => i.date); 
       inOutBarOptions.series[0].data = inRes.data.data.map(i => i.value);
     }
-    // 处理出库
     if (outRes.code === 200 && outRes.data.data) {
       inOutBarOptions.series[1].data = outRes.data.data.map(i => i.value);
     }
@@ -224,151 +227,35 @@ const handleFilterChange = () => {
 };
 
 onMounted(() => {
+  // ✅ 确保加载仓库列表
+  warehouseStore.fetchWarehouses();
   fetchData();
 });
 </script>
 
 <style scoped>
-.analysis-container {
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.header-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.left-controls {
-  display: flex;
-  align-items: center;
-}
-
-.page-title {
-  margin: 0;
-  color: #fff;
-  font-size: 20px;
-}
-
-.mb-20 {
-  margin-bottom: 20px;
-}
-
-.kpi-card,
-.chart-card {
-  background: #1d1e1f;
-  border: 1px solid #333;
-  color: #fff;
-}
-
-.kpi-card {
-  height: 180px;
-  display: flex;
-  flex-direction: column;
-}
-
-.kpi-card :deep(.el-card__body) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.card-title {
-  font-weight: bold;
-  font-size: 14px;
-  color: #cfd3dc;
-}
-
-.number {
-  font-size: 28px;
-  font-weight: bold;
-  margin: 0 0 10px 0;
-  font-family: 'DIN', sans-serif;
-}
-
-.number.danger {
-  color: #F56C6C;
-}
-
-.desc {
-  font-size: 12px;
-  color: #909399;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.trend.up {
-  color: #67C23A;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-}
-
-.text-warning {
-  color: #E6A23C;
-  font-weight: bold;
-}
-
-.progress-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-}
-
-.progress-content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  line-height: 1.2;
-  transform: translateY(-8px);
-}
-
-.percentage-value {
-  display: block;
-  font-size: 20px;
-  font-weight: bold;
-  color: #fff;
-  margin-bottom: 2px;
-}
-
-.percentage-label {
-  font-size: 12px;
-  color: #909399;
-}
-
-:deep(.el-radio-button__inner) {
-  background: #262729;
-  border-color: #4c4d4f;
-  color: #cfd3dc;
-  box-shadow: none;
-}
-
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background-color: #409EFF;
-  border-color: #409EFF;
-  color: #fff;
-}
-
-:deep(.el-select__wrapper) {
-  background-color: #262729 !important;
-  box-shadow: 0 0 0 1px #4c4d4f inset !important;
-}
-
-:deep(.el-select__placeholder) {
-  color: #cfd3dc;
-}
+/* 样式保持不变 */
+.analysis-container { padding: 20px; box-sizing: border-box; }
+.header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.left-controls { display: flex; align-items: center; }
+.page-title { margin: 0; color: #fff; font-size: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.kpi-card, .chart-card { background: #1d1e1f; border: 1px solid #333; color: #fff; }
+.kpi-card { height: 180px; display: flex; flex-direction: column; }
+.kpi-card :deep(.el-card__body) { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 20px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.card-title { font-weight: bold; font-size: 14px; color: #cfd3dc; }
+.number { font-size: 28px; font-weight: bold; margin: 0 0 10px 0; font-family: 'DIN', sans-serif; }
+.number.danger { color: #F56C6C; }
+.desc { font-size: 12px; color: #909399; display: flex; align-items: center; gap: 5px; }
+.trend.up { color: #67C23A; font-weight: bold; display: flex; align-items: center; }
+.text-warning { color: #E6A23C; font-weight: bold; }
+.progress-wrapper { display: flex; justify-content: center; align-items: center; height: 100%; }
+.progress-content { display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.2; transform: translateY(-8px); }
+.percentage-value { display: block; font-size: 20px; font-weight: bold; color: #fff; margin-bottom: 2px; }
+.percentage-label { font-size: 12px; color: #909399; }
+:deep(.el-radio-button__inner) { background: #262729; border-color: #4c4d4f; color: #cfd3dc; box-shadow: none; }
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #409EFF; border-color: #409EFF; color: #fff; }
+:deep(.el-select__wrapper) { background-color: #262729 !important; box-shadow: 0 0 0 1px #4c4d4f inset !important; }
+:deep(.el-select__placeholder) { color: #cfd3dc; }
 </style>

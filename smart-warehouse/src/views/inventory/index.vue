@@ -19,9 +19,13 @@
           />
         </el-form-item>
         <el-form-item label="仓库/库区">
-          <el-select v-model="searchForm.zone" placeholder="全部区域" style="width: 180px">
-            <el-option label="A区 (电子区)" value="A" />
-            <el-option label="B区 (五金区)" value="B" />
+          <el-select v-model="searchForm.warehouse_id" placeholder="全部区域" style="width: 180px" clearable>
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -80,24 +84,23 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
-// 1. 引入路由钩子
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-// 引入图标
 import { Search, Refresh, Download, View, Histogram } from '@element-plus/icons-vue';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
-// 2. 初始化路由实例
 const router = useRouter();
+const warehouseStore = useWarehouseStore();
 const loading = ref(false);
 
 // 搜索表单数据
 const searchForm = reactive({
   code: '',
   name: '',
-  zone: ''
+  warehouse_id: '' // 保持与后端参数一致
 });
 
-// 模拟数据
+// 模拟数据 (后续可替换为 api/inventory.js 中的 getInventoryList)
 const inventoryList = reactive([
   { materialCode: 'M-1001', materialName: '32位微控制器', spec: 'STM32F103', category: '电子元器件', currentQty: 1500, availableQty: 1450, maxStock: 2000, unit: 'pcs', location: 'A-01-02' },
   { materialCode: 'M-1002', materialName: '工业级继电器', spec: '24V DC', category: '电气件', currentQty: 230, availableQty: 230, maxStock: 500, unit: '个', location: 'B-03-11' },
@@ -106,37 +109,38 @@ const inventoryList = reactive([
   { materialCode: 'M-1005', materialName: 'PLC控制模块', spec: 'FX3U-32MT', category: '控制器', currentQty: 45, availableQty: 40, maxStock: 100, unit: '套', location: 'A-02-01' },
 ]);
 
-// 计算进度条百分比
+onMounted(() => {
+  // ✅ 挂载时获取仓库列表
+  warehouseStore.fetchWarehouses();
+});
+
 const calculateStockPercent = (row) => {
   if (!row.maxStock) return 0;
   let percent = (row.currentQty / row.maxStock) * 100;
   return percent > 100 ? 100 : percent;
 };
 
-// 根据库存量决定进度条颜色
 const getStockStatus = (row) => {
   if (!row.maxStock) return 'success';
   const percent = row.currentQty / row.maxStock;
-  if (percent < 0.2) return 'exception'; // 红
-  if (percent > 0.9) return 'warning';   // 黄
-  return 'success';                      // 绿
+  if (percent < 0.2) return 'exception'; 
+  if (percent > 0.9) return 'warning';  
+  return 'success';                      
 };
 
 const handleSearch = () => {
   loading.value = true;
+  console.log('Search params:', searchForm);
   setTimeout(() => loading.value = false, 500);
 };
 
 const resetSearch = () => {
   searchForm.code = '';
   searchForm.name = '';
-  searchForm.zone = '';
+  searchForm.warehouse_id = '';
 };
 
-// 3. 核心跳转逻辑
 const handleDetail = (row) => {
-  console.log('正在跳转详情页，ID:', row.materialCode);
-  // 对应路由: path: 'detail/:id'
   router.push(`/inventory/detail/${row.materialCode}`);
 };
 

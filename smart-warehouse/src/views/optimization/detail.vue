@@ -94,46 +94,99 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { Download, Document, List, Right } from '@element-plus/icons-vue';
-// 替换引入
+import { ElMessage } from 'element-plus';
+import { useWarehouseStore } from '@/stores/warehouse'; // 确保 store 路径正确
 import { downloadFileFromUrl } from '@/utils/exportReport';
 import { getOptimizationPlanReport, getOptimizationPlanTasks } from '@/api/optimization';
-// 引入导出 API (复用 report 模块的接口)
 import { exportReport } from '@/api/report';
-import { ElMessage } from 'element-plus';
 
-// ... (变量定义和 helper 函数保持不变) ...
 const route = useRoute();
+const warehouseStore = useWarehouseStore();
+// 确保 planId 存在，如果路由没有传 id，这里就是 undefined
 const planId = route.params.id;
+
 const loading = ref(false);
 const planData = ref({});
-const reportData = ref({}); // 这里面应该有 report_id
+const reportData = ref({});
 const taskList = ref([]);
 const taskTotal = ref(0);
 
-const loadData = async () => {
+// --- Helper Functions (修复 _ctx is not a function 报错) ---
+
+const getWarehouseName = (id) => {
+  if (!id) return '-';
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
+};
+
+const getStatusLabel = (status) => {
+  const map = { 'PENDING': '待执行', 'EXECUTING': '执行中', 'COMPLETED': '已完成', 'FAILED': '失败' };
+  return map[status] || status;
+};
+
+const getStatusClass = (status) => {
+  if (status === 'EXECUTING') return 'text-primary';
+  if (status === 'COMPLETED') return 'text-success';
+  if (status === 'FAILED') return 'text-warning';
+  return 'text-gray';
+};
+
+// --- API Calls ---
+
+// 加载任务列表
+const loadTasks = async (page = 1) => {
   if (!planId) return;
+  try {
+    // ⚠️ 关键修正：这里必须使用 plan_id (下划线)，与 optimization.js 中的解构对应
+    const params = {
+      plan_id: planId, 
+      page: page,
+      page_size: 10
+      // status: '' // 如果需要筛选状态可加
+    };
+    
+    // 调用 API，optimization.js 会从 params 里提取 plan_id 拼接到 URL
+    const res = await getOptimizationPlanTasks(params);
+    
+    if (res.code === 200) {
+      taskList.value = res.data.items || [];
+      taskTotal.value = res.data.total || 0;
+    }
+  } catch (error) {
+    console.error("加载任务失败", error);
+    // 这里不弹窗报错，以免干扰主流程，任务加载失败不影响报告查看
+  }
+};
+
+// 加载详情和报告
+const loadData = async () => {
+  if (!planId) {
+    ElMessage.error('参数错误：未获取到方案ID');
+    return;
+  }
+  
   loading.value = true;
   try {
+    // 1. 获取方案详情和报告 (这个接口 optimization.js 定义是直接传 ID)
     const reportRes = await getOptimizationPlanReport(planId);
+    
     if (reportRes.code === 200) {
       planData.value = reportRes.data.plan || {};
-      // ⚠️ 关键：确保拿到 report 对象里的 report_id
       reportData.value = reportRes.data.report || {};
     }
+    
+    // 2. 加载任务列表
     await loadTasks(1);
+    
   } catch (err) {
     console.error(err);
-    ElMessage.error('数据加载失败');
+    ElMessage.error('数据加载失败，请检查网络或后端服务');
   } finally {
     loading.value = false;
   }
 };
 
-// ... (loadTasks 保持不变) ...
-
-// ✅ 修改：对接后端导出
 const handleExport = async () => {
-  // 优先使用 reportData 中的 report_id
   const targetId = reportData.value.report_id;
   
   if (!targetId) {
@@ -156,30 +209,43 @@ const handleExport = async () => {
 };
 
 onMounted(() => {
+  // 确保仓库字典已加载
+  if (warehouseStore.warehouseList.length === 0) {
+    warehouseStore.fetchWarehouses();
+  }
   loadData();
 });
 </script>
 
 <style scoped>
-/* 样式保留 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .mx-2 { margin: 0 8px; }
 .mr-5 { margin-right: 5px; }
-.text-success { color: #67C23A; }
-.text-warning { color: #E6A23C; }
-.text-primary { color: #409EFF; }
+
+/* 文本颜色 */
+.text-success { color: #67C23A; font-weight: bold; }
+.text-warning { color: #F56C6C; font-weight: bold; }
+.text-primary { color: #409EFF; font-weight: bold; }
 .text-gray { color: #909399; }
+
 .custom-header { background: #1d1e1f; padding: 15px; border: 1px solid #333; }
 :deep(.el-page-header__content) { color: #fff; }
+
 .detail-card { background: #1d1e1f; border: 1px solid #333; color: #cfd3dc; }
 .card-header { font-weight: bold; color: #fff; }
+
+/* 描述列表样式适配深色模式 */
 :deep(.custom-desc .el-descriptions__label) { background: #262729 !important; color: #909399; width: 120px; }
 :deep(.custom-desc .el-descriptions__content) { background: #1d1e1f !important; color: #fff; }
+
+/* 报告 HTML 内容样式 */
 .report-html-content { line-height: 1.8; color: #cfd3dc; padding: 10px; }
 :deep(strong) { color: #409EFF; }
 :deep(ul) { padding-left: 20px; }
 :deep(li) { margin-bottom: 8px; }
+
+/* 表格样式 */
 :deep(.el-table) {
   background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333;
   --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
@@ -190,6 +256,8 @@ onMounted(() => {
   border-right: 1px solid #333 !important;
 }
 :deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; }
+
+/* 分页样式 */
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
 :deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }

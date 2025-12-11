@@ -10,14 +10,24 @@
           <el-icon class="stat-icon text-danger"><Warning /></el-icon>
         </el-card>
       </el-col>
-      </el-row>
+    </el-row>
 
     <el-card shadow="never" class="main-card">
       <div class="filter-bar mb-20">
         <div class="left-filters">
-          <el-select v-model="filters.warehouse_id" placeholder="选择仓库" style="width: 160px; margin-right: 15px" clearable @change="loadData">
-            <el-option label="Zone A" :value="1" />
-            <el-option label="Zone B" :value="2" />
+          <el-select 
+            v-model="filters.warehouse_id" 
+            placeholder="选择仓库" 
+            style="width: 160px; margin-right: 15px" 
+            clearable 
+            @change="loadData"
+          >
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
           
           <el-radio-group v-model="filters.alert_type" class="custom-radio-group" @change="loadData">
@@ -166,25 +176,29 @@
 import { ref, reactive, onMounted } from 'vue';
 import { Warning, Refresh, DataAnalysis, MagicStick } from '@element-plus/icons-vue';
 import { getInventoryAlerts, getInventoryAlertDetail } from '@/api/inventory';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
 
 const loading = ref(false);
 const drawerLoading = ref(false);
 const filters = reactive({
   warehouse_id: '',
-  alert_type: '', // 空字符串代表全部
+  alert_type: '', 
   page: 1,
   page_size: 10
 });
 
 const total = ref(0);
-const totalAlerts = ref(0); // 仅做列表总数展示，如果需要分状态统计需要额外API支持
+const totalAlerts = ref(0); 
 const alertList = ref([]);
 const drawerVisible = ref(false);
 const currentAlert = ref(null);
 
+// ✅ 修改：从 Store 获取仓库名
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A', 2: 'Zone B' };
-  return map[id] || `WH-${id}`;
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const getLevelTag = (level) => {
@@ -206,7 +220,7 @@ const loadData = async () => {
     if (res.code === 200) {
       alertList.value = res.data.items;
       total.value = res.data.total;
-      totalAlerts.value = res.data.total; // 更新总数
+      totalAlerts.value = res.data.total; 
     }
   } catch (e) {
     console.error(e);
@@ -218,7 +232,7 @@ const loadData = async () => {
 const openDrawer = async (row) => {
   drawerVisible.value = true;
   drawerLoading.value = true;
-  currentAlert.value = null; // 清空旧数据
+  currentAlert.value = null;
   try {
     const res = await getInventoryAlertDetail(row.alert_id);
     if (res.code === 200) {
@@ -232,12 +246,14 @@ const openDrawer = async (row) => {
 };
 
 onMounted(() => {
+  // ✅ 加载仓库列表
+  warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
-/* 保持原有样式，省略以节省篇幅，请保留原文件的 style */
+/* 样式保持不变 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .mb-5 { margin-bottom: 5px; }

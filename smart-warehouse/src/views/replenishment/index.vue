@@ -3,9 +3,18 @@
     <el-card shadow="never" class="search-card mb-20">
       <el-form :inline="true" :model="filters" class="search-form">
         <el-form-item label="仓库">
-          <el-select v-model="filters.warehouse_id" placeholder="全部" style="width: 120px" clearable>
-            <el-option label="Zone A" :value="1" />
-            <el-option label="Zone B" :value="2" />
+          <el-select 
+            v-model="filters.warehouse_id" 
+            placeholder="全部" 
+            style="width: 120px" 
+            clearable
+          >
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="商品ID">
@@ -127,9 +136,19 @@
               />
             </el-form-item>
             <el-form-item>
-              <el-select v-model="configFilters.warehouse_id" placeholder="仓库" style="width: 120px" clearable @change="loadConfigList">
-                <el-option label="Zone A" :value="1" />
-                <el-option label="Zone B" :value="2" />
+              <el-select 
+                v-model="configFilters.warehouse_id" 
+                placeholder="仓库" 
+                style="width: 120px" 
+                clearable 
+                @change="loadConfigList"
+              >
+                <el-option 
+                  v-for="item in warehouseStore.warehouseList"
+                  :key="item.warehouse_id"
+                  :label="item.warehouse_name"
+                  :value="item.warehouse_id"
+                />
               </el-select>
             </el-form-item>
             <el-form-item>
@@ -193,8 +212,11 @@ import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Setting } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getReplenishmentList, getReplenishmentConfigList, updateReplenishmentConfig } from '@/api/replenishment';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
 
 const router = useRouter();
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref([]);
@@ -226,13 +248,16 @@ const openConfigDialog = () => {
 const loadConfigList = async () => {
   configLoading.value = true;
   try {
-    // 模拟数据
+    // 模拟数据 (这里保留模拟，但 ID 对接真实仓库ID)
     await new Promise(resolve => setTimeout(resolve, 500));
+    // 为了演示效果，随机分配一个真实的仓库ID（如果列表为空则默认1）
+    const defaultWhId = warehouseStore.warehouseList.length > 0 ? warehouseStore.warehouseList[0].warehouse_id : 1;
+    
     const mockData = Array.from({ length: 10 }).map((_, idx) => ({
       id: idx,
       goods_code: `MAT-CONFIG-${1000 + idx}`,
       goods_name: `模拟商品 ${idx + 1}`,
-      warehouse_id: idx % 2 === 0 ? 1 : 2,
+      warehouse_id: defaultWhId, 
       enabled: idx % 3 !== 0,
       switching: false
     }));
@@ -250,7 +275,6 @@ const loadConfigList = async () => {
 const handleConfigChange = async (row) => {
   row.switching = true;
   try {
-    // 模拟请求成功
     await new Promise(resolve => setTimeout(resolve, 600));
     ElMessage.success(`${row.goods_name} 预测功能已${row.enabled ? '开启' : '关闭'}`);
   } catch (error) {
@@ -262,9 +286,10 @@ const handleConfigChange = async (row) => {
   }
 };
 
+// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A', 2: 'Zone B' };
-  return map[id] || `WH-${id}`;
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const getUrgencyLabel = (val) => {
@@ -322,12 +347,14 @@ const goDetail = (row) => {
 };
 
 onMounted(() => {
+  // ✅ 加载仓库
+  warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
-/* 样式保留 */
+/* 样式保持不变 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .search-card { background: #1d1e1f; border: 1px solid #333; }
@@ -359,8 +386,6 @@ onMounted(() => {
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
 :deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
-
-/* 弹窗样式补充 */
 :deep(.el-dialog) { background-color: #1d1e1f; border: 1px solid #333; }
 :deep(.el-dialog__title) { color: #fff; }
 :deep(.el-dialog__body) { padding-top: 10px; }

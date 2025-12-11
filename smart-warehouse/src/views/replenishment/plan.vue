@@ -9,8 +9,12 @@
             style="width: 160px" 
             @change="handleSearch"
           >
-            <el-option label="Zone A (电子区)" :value="1" />
-            <el-option label="Zone B (五金区)" :value="2" />
+            <el-option 
+              v-for="item in warehouseStore.warehouseList"
+              :key="item.warehouse_id"
+              :label="item.warehouse_name"
+              :value="item.warehouse_id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="日期范围">
@@ -70,7 +74,9 @@
           </el-table-column>
           
           <el-table-column label="仓库" width="100">
-             <template #default="{ row }">{{ getWarehouseName(row.warehouse_id) }}</template>
+             <template #default="{ row }">
+               {{ getWarehouseName(row.warehouse_id) }}
+             </template>
           </el-table-column>
           
           <el-table-column prop="planned_quantity" label="计划数量" width="120" align="center">
@@ -96,8 +102,11 @@
 import { ref, reactive, onMounted, watch } from 'vue';
 import { Search, Refresh } from '@element-plus/icons-vue';
 import { getReplenishmentPlans } from '@/api/replenishment';
-import { ElMessage } from 'element-plus'; // 引入消息提示
+import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
+import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+
+const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
 
 const calendarDate = ref(new Date());
 const drawerVisible = ref(false);
@@ -107,14 +116,14 @@ const loading = ref(false);
 const planList = ref([]);
 
 const filters = reactive({
-  // ⚠️ 核心修复：这里必须给默认值 1，对应 Zone A
-  warehouse_id: 1, 
+  warehouse_id: null, 
   dateRange: []
 });
 
+// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A', 2: 'Zone B' };
-  return map[id] || `WH-${id}`;
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const getPlansByDate = (dateStr) => {
@@ -122,9 +131,12 @@ const getPlansByDate = (dateStr) => {
 };
 
 const loadPlans = async () => {
-  // ⚠️ 防御性编程：如果没有 warehouse_id，直接提示并返回，防止发错误的请求
+  // 必须选择仓库才能查询，否则后端可能报错
   if (!filters.warehouse_id) {
-    ElMessage.warning('请选择仓库');
+    // 如果还没加载完仓库列表，先不提示，等加载完会自动触发
+    if (warehouseStore.warehouseList.length > 0) {
+       ElMessage.warning('请选择仓库');
+    }
     return;
   }
 
@@ -136,7 +148,6 @@ const loadPlans = async () => {
       end = filters.dateRange[1];
     } else {
       const current = dayjs(calendarDate.value);
-      // 缩小查询范围为当前月的前后，避免一次查太多
       start = current.startOf('month').format('YYYY-MM-DD');
       end = current.endOf('month').format('YYYY-MM-DD');
     }
@@ -144,12 +155,10 @@ const loadPlans = async () => {
     const params = {
       start_date: start,
       end_date: end,
-      warehouse_id: String(filters.warehouse_id), // 显式转为字符串
+      warehouse_id: String(filters.warehouse_id),
       page: 1,
-      page_size: 100 // 调小一点 page_size，防止后端处理压力过大报 422
+      page_size: 100 
     };
-
-    console.log('Sending API Request:', params); // 调试用：请在控制台看打印出的参数
 
     const res = await getReplenishmentPlans(params);
     if (res.code === 200) {
@@ -157,7 +166,6 @@ const loadPlans = async () => {
     }
   } catch (e) {
     console.error('加载日历失败:', e);
-    // 可以在这里打印 e.response.data 看看后端具体报什么错
   } finally {
     loading.value = false;
   }
@@ -177,7 +185,10 @@ const handleSearch = () => {
 };
 
 const resetSearch = () => {
-  filters.warehouse_id = 1; // 重置时也要保持默认值
+  // 重置为第一个仓库
+  if (warehouseStore.warehouseList.length > 0) {
+    filters.warehouse_id = warehouseStore.warehouseList[0].warehouse_id;
+  }
   filters.dateRange = [];
   calendarDate.value = new Date();
   loadPlans();
@@ -189,50 +200,30 @@ watch(calendarDate, () => {
   }
 });
 
-onMounted(() => {
-  loadPlans();
+onMounted(async () => {
+  // ✅ 1. 先获取仓库列表
+  await warehouseStore.fetchWarehouses();
+  
+  // ✅ 2. 默认选中第一个仓库并加载计划
+  if (warehouseStore.warehouseList.length > 0) {
+    filters.warehouse_id = warehouseStore.warehouseList[0].warehouse_id;
+    loadPlans();
+  }
 });
 </script>
 
 <style scoped>
-/* 样式保留 */
+/* 样式保持不变 */
 .page-container { 
-  height: 100%; 
-  box-sizing: border-box;
-  padding: 20px; 
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; 
+  height: 100%; box-sizing: border-box; padding: 20px; 
+  display: flex; flex-direction: column; overflow: hidden; 
 }
 .mb-20 { margin-bottom: 20px; }
-.search-card { 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  flex-shrink: 0; 
-}
-.search-card :deep(.el-card__body) {
-  height: 80px; 
-  display: flex;
-  align-items: center; 
-  padding: 0 20px;
-}
-.search-form :deep(.el-form-item) {
-  margin-bottom: 0 !important;
-  margin-right: 20px;
-}
-.calendar-card { 
-  flex: 1; 
-  background: #1d1e1f; 
-  border: 1px solid #333; 
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-:deep(.el-card__body) {
-  flex: 1; 
-  padding: 0; 
-  overflow-y: auto;
-}
+.search-card { background: #1d1e1f; border: 1px solid #333; flex-shrink: 0; }
+.search-card :deep(.el-card__body) { height: 80px; display: flex; align-items: center; padding: 0 20px; }
+.search-form :deep(.el-form-item) { margin-bottom: 0 !important; margin-right: 20px; }
+.calendar-card { flex: 1; background: #1d1e1f; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+:deep(.el-card__body) { flex: 1; padding: 0; overflow-y: auto; }
 :deep(.el-calendar) { background-color: transparent; --el-calendar-border: 1px solid #333; --el-calendar-selected-bg-color: #2c3e50; }
 :deep(.el-calendar__header) { border-bottom: 1px solid #333; padding: 12px 20px; }
 :deep(.el-calendar__title) { color: #fff; font-weight: bold; }
