@@ -14,9 +14,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://123.57.85.75:8000', // 修改为真实后端地址
+        target: 'http://123.57.85.75:8000',
         changeOrigin: true
-        // rewrite: (path) => path.replace(/^\/api/, '') // 如果后端不需要 /api 前缀请取消注释，但通常保留
+        // rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   }

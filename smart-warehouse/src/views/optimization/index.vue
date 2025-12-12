@@ -41,19 +41,19 @@
       >
         <el-table-column prop="plan_code" label="方案编号" width="180" fixed show-overflow-tooltip />
         
-        <el-table-column label="仓库" width="120" align="center">
+        <el-table-column label="仓库" min-width="140" align="center">
           <template #default="{ row }">
-            <el-tag effect="plain" type="info">{{ getWarehouseName(row.warehouse_id) }}</el-tag>
+            {{ getWarehouseName(row.warehouse_id) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="任务名称" min-width="180" show-overflow-tooltip>
+        <el-table-column label="任务名称" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">
             {{ getOptimizationTypeLabel(row.optimization_type) }} - {{ row.plan_code }}
           </template>
         </el-table-column>
 
-        <el-table-column prop="optimization_type" label="优化类型" width="120" align="center">
+        <el-table-column prop="optimization_type" label="优化类型" min-width="140" align="center">
           <template #default="{ row }">
             <el-tag effect="dark" :type="getPlanTypeTag(row.optimization_type)">
               {{ getOptimizationTypeLabel(row.optimization_type) }}
@@ -61,9 +61,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="创建时间" width="170" />
+        <el-table-column prop="created_at" label="创建时间" min-width="180" align="center" />
         
-        <el-table-column prop="status" label="状态" width="120" align="center">
+        <el-table-column prop="status" label="状态" min-width="120" align="center">
           <template #default="{ row }">
             <span class="status-dot" :class="getStatusClass(row.status)"></span> 
             {{ getStatusLabel(row.status) }}
@@ -74,7 +74,7 @@
           <template #default="{ row }">
               <el-button link type="primary" :icon="View" @click="goDetail(row)">查看详情</el-button>
               <el-button link type="primary" :icon="Download" @click="handleExport(row)"
-                :disabled="row.status !== 'COMPLETED'" :title="row.status !== 'COMPLETED' ? '方案执行完成后方可导出报告' : ''">
+              :title="row.status !== 'COMPLETED' ? '方案执行完成后方可导出报告' : ''">
                 导出方案
               </el-button>
           </template>
@@ -103,10 +103,10 @@ import { ElMessage } from 'element-plus';
 import { getOptimizationPlans, getOptimizationPlanReport } from '@/api/optimization';
 import { exportReport } from '@/api/report'; 
 import { downloadFileFromUrl } from '@/utils/exportReport'; 
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { useWarehouseStore } from '@/stores/warehouse'; 
 
 const router = useRouter();
-const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+const warehouseStore = useWarehouseStore(); 
 
 const loading = ref(false);
 const total = ref(0);
@@ -119,7 +119,6 @@ const filters = reactive({
   page_size: 10
 });
 
-// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
   const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
   return found ? found.warehouse_name : `WH-${id}`;
@@ -184,28 +183,19 @@ const goDetail = (row) => {
   router.push(`/optimization/plans/${row.plan_id}`);
 };
 
-// src/views/optimization/index.vue
-
 const handleExport = async (row) => {
   try {
     ElMessage.info('正在获取方案报告...');
     const detailRes = await getOptimizationPlanReport(row.plan_id);
     
-    // 🔍 调试：你可以打印一下看看结构
-    console.log('报告详情返回:', detailRes);
-
-    // 🔴 [修改点 1]：修正判断逻辑
-    // 原代码：if (detailRes.code !== 200 || !detailRes.data.report || !detailRes.data.report.report_id) {
-    // 新代码：直接检查 data 下是否有 report_id (兼容 flat 结构)
-    // 为了稳健，我们同时兼容“有 report 对象”和“无 report 对象”两种情况
-    const reportData = detailRes.data.report || detailRes.data; // 优先取 report，取不到就取 data 本身
+    // 兼容后端数据结构 (report 对象或直接平铺)
+    const reportData = detailRes.data.report || detailRes.data; 
 
     if (detailRes.code !== 200 || !reportData || !reportData.report_id) {
       ElMessage.warning('该方案尚未生成分析报告，无法导出');
       return;
     }
 
-    // 🔴 [修改点 2]：获取正确的 ID
     const reportId = reportData.report_id;
 
     ElMessage.info('正在请求下载链接...');
@@ -224,7 +214,6 @@ const handleExport = async (row) => {
 };
 
 onMounted(() => {
-  // ✅ 加载仓库
   warehouseStore.fetchWarehouses();
   loadData();
 });

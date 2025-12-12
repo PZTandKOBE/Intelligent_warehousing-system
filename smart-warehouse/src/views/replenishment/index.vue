@@ -46,20 +46,20 @@
       >
         <el-table-column prop="recommendation_id" label="建议ID" width="100" fixed show-overflow-tooltip />
         
-        <el-table-column label="物料信息" min-width="180" show-overflow-tooltip>
+        <el-table-column label="物料信息" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">
             <div><span class="text-primary font-bold">{{ row.goods_code || `ID: ${row.goods_id}` }}</span></div>
             <div class="sub-text">{{ row.goods_name || '-' }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column label="仓库" width="100" align="center">
+        <el-table-column label="仓库" min-width="140" align="center">
           <template #default="{ row }">
             {{ getWarehouseName(row.warehouse_id) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="库存概况 (现存/安全)" width="180">
+        <el-table-column label="库存概况 (现存/安全)" min-width="180" align="center">
           <template #default="{ row }">
             <div class="stock-compare">
               <span :class="row.current_stock < row.safety_stock ? 'text-danger' : ''">{{ row.current_stock }}</span>
@@ -69,13 +69,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="recommended_quantity" label="推荐补货量" width="120" align="center">
+        <el-table-column prop="recommended_quantity" label="推荐补货量" min-width="140" align="center">
           <template #default="{ row }">
             <span class="font-bold text-success">+{{ row.recommended_quantity }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="urgency" label="紧急程度" width="100" align="center">
+        <el-table-column prop="urgency" label="紧急程度" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getUrgencyTag(row.urgency)" effect="dark" size="small">
               {{ getUrgencyLabel(row.urgency) }}
@@ -83,7 +83,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'PENDING' ? 'warning' : 'info'" effect="plain" size="small">
               {{ getStatusLabel(row.status) }}
@@ -119,7 +119,7 @@
       <div class="config-container">
         <div class="mb-20 flex justify-between">
           <el-alert 
-            title="关闭预测的商品将不再生成补货建议" 
+            title="关闭预测的商品将不再生成补货建议 (演示模式)" 
             type="warning" 
             effect="dark"
             show-icon 
@@ -414,6 +414,7 @@ onMounted(() => {
 .text-gray { color: #909399; }
 .font-bold { font-weight: bold; }
 .sub-text { font-size: 12px; color: #909399; }
+.stock-compare { display: flex; align-items: center; justify-content: center; gap: 5px; } /* 居中对齐 */
 .divider { margin: 0 5px; color: #555; }
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
 :deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
