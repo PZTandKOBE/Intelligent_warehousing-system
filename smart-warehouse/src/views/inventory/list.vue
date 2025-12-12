@@ -79,12 +79,6 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="类型" width="120" show-overflow-tooltip>
-           <template #default="{ row }">
-             {{ row.goods_type || '-' }}
-           </template>
-        </el-table-column>
-        
         <el-table-column label="位置信息" width="180">
           <template #default="{ row }">
             <div>{{ getWarehouseName(row.warehouse_id) }}</div>
@@ -148,10 +142,10 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';     
 import autoTable from 'jspdf-autotable'; 
 import { getInventoryList } from '@/api/inventory';
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { useWarehouseStore } from '@/stores/warehouse';
 
 const router = useRouter();
-const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+const warehouseStore = useWarehouseStore();
 
 const loading = ref(false);
 const total = ref(0);
@@ -166,7 +160,6 @@ const searchForm = reactive({
   page_size: 10
 });
 
-// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
   const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
   return found ? found.warehouse_name : `WH-${id}`;
@@ -227,7 +220,13 @@ const viewDetail = (row) => {
     ElMessage.error('无法获取商品ID，请检查列表数据');
     return;
   }
-  router.push(`/inventory/detail/${id}`);
+  // 🟢 关键修改：传递 query 参数
+  router.push({
+    path: `/inventory/detail/${id}`,
+    query: {
+      warehouse_id: row.warehouse_id
+    }
+  });
 };
 
 const handleExportExcel = async () => {
@@ -240,7 +239,6 @@ const handleExportExcel = async () => {
     const exportData = tableData.value.map(item => ({
       '商品编码': item.goods_code,
       '商品名称': item.goods_name,
-      '类型': item.goods_type || '-',
       '仓库': getWarehouseName(item.warehouse_id),
       '库位': item.storage_code || '-',
       '总库存': item.total_number,
@@ -281,11 +279,10 @@ const handleExportPDF = async () => {
     doc.addFont('SimHei.ttf', 'SimHei', 'normal');
     doc.setFont('SimHei');
 
-    const tableColumn = ["商品编码", "商品名称", "类型", "仓库", "总库存", "可用", "快照时间"];
+    const tableColumn = ["商品编码", "商品名称", "仓库", "总库存", "可用", "快照时间"];
     const tableRows = tableData.value.map(item => [
       item.goods_code,
       item.goods_name,
-      item.goods_type || '-',
       getWarehouseName(item.warehouse_id),
       String(item.total_number),
       String(item.available_total_number),
@@ -322,14 +319,13 @@ const arrayBufferToBase64 = (buffer) => {
 };
 
 onMounted(() => {
-  // ✅ 加载仓库
   warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
-/* 样式保持不变 */
+/* 样式保留 */
 .page-container { padding: 20px; box-sizing: border-box; }
 .mb-20 { margin-bottom: 20px; }
 .ml-10 { margin-left: 10px; }

@@ -31,7 +31,7 @@ export async function getDashboardHeatmap(warehouseId) {
 }
 
 /**
- * 获取库位详情 (根据文档，可能是库存查询筛选)
+ * 获取库位详情 
  */
 export async function getStorageDetail(storageCode) {
   return request({

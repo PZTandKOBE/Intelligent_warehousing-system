@@ -343,7 +343,12 @@ const resetSearch = () => {
 };
 
 const goDetail = (row) => {
-  router.push(`/replenishment/recommendations/${row.recommendation_id}`);
+  router.push({
+    path: `/replenishment/recommendations/${row.recommendation_id}`,
+    query: { 
+      warehouse_id: row.warehouse_id  // 把当前行的仓库ID传过去
+    }
+  });
 };
 
 onMounted(() => {

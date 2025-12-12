@@ -85,7 +85,11 @@
         </el-tab-pane>
 
         <el-tab-pane label="📈 库存趋势" name="trend">
-          <div class="trend-chart-container" style="padding: 10px;">
+          <div 
+            class="trend-chart-container" 
+            style="padding: 10px;" 
+            v-if="activeTab === 'trend'"
+          >
             <div class="chart-controls mb-20" style="display:flex; justify-content:flex-end;">
               <el-radio-group v-model="trendPeriod" size="small" @change="loadHistory">
                 <el-radio-button label="7d">近7天</el-radio-button>
@@ -128,12 +132,14 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, Edit, Refresh, Box } from '@element-plus/icons-vue';
 import { getInventoryDetail, getInventoryTransactions, getInventoryHistory } from '@/api/inventory';
+import { useWarehouseStore } from '@/stores/warehouse'; // 🟢 1. 引入 Store
 import { ElMessage } from 'element-plus';
-import BaseChart from '@/components/BaseChart.vue'; // 引入图表组件
+import BaseChart from '@/components/BaseChart.vue'; 
 import dayjs from 'dayjs';
 
 const router = useRouter();
 const route = useRoute();
+const warehouseStore = useWarehouseStore(); // 🟢 2. 初始化 Store
 const activeTab = ref('location');
 const loading = ref(false);
 const trendPeriod = ref('7d');
@@ -143,7 +149,7 @@ const itemInfo = ref({
   goods_id: '',
   goods_code: '',
   goods_name: '',
-  warehouse_id: '',
+  warehouse_id: '', 
   storage_code: ''
 });
 
@@ -182,9 +188,12 @@ const chartOptions = reactive({
   }]
 });
 
+// 🟢 3. 修改：使用 Store 查找仓库名，替代硬编码 map
 const getWarehouseName = (id) => {
-  const map = { 1: 'Zone A', 2: 'Zone B' };
-  return map[id] || `WH-${id}`;
+  if (!id) return '-';
+  const targetId = Number(id); // 确保类型一致
+  const found = warehouseStore.warehouseList.find(w => w.warehouse_id === targetId);
+  return found ? found.warehouse_name : `WH-${id}`;
 };
 
 // 加载基础数据
@@ -201,15 +210,27 @@ const loadData = async () => {
     const detailRes = await getInventoryDetail(id);
     if (detailRes.code === 200) {
       itemInfo.value = detailRes.data;
+      
+      // 🟢 4. 核心逻辑：优先使用路由传过来的 warehouse_id (父传子)
+      // 如果后端没返回，或者我们想强制用列表页传过来的 ID
+      if (route.query.warehouse_id) {
+        itemInfo.value.warehouse_id = Number(route.query.warehouse_id);
+      }
+
+      // 处理嵌套的 current_stock
       if (detailRes.data.current_stock) {
         stockInfo.value = detailRes.data.current_stock;
       }
     }
 
-    // 2. 获取流水
-    const transRes = await getInventoryTransactions({ goods_id: id, page: 1, page_size: 10 });
-    if (transRes.code === 200) {
-      historyList.value = transRes.data.items || [];
+    // 2. 获取流水 (如果后端流水接口404还没修好，这里可能会报错，已加 try-catch 保护)
+    try {
+        const transRes = await getInventoryTransactions({ goods_id: id, page: 1, page_size: 10 });
+        if (transRes.code === 200) {
+          historyList.value = transRes.data.items || [];
+        }
+    } catch (e) {
+        console.warn('流水接口暂不可用或请求失败');
     }
     
     // 3. 如果当前是趋势图 Tab，加载历史
@@ -229,7 +250,6 @@ const loadHistory = async () => {
   const id = route.params.id;
   if (!id) return;
 
-  // 计算日期范围
   const end = dayjs().format('YYYY-MM-DD');
   let start;
   if (trendPeriod.value === '7d') {
@@ -244,10 +264,31 @@ const loadHistory = async () => {
       end_date: end
     });
 
-    if (res.code === 200 && res.data.items) {
-      // 假设后端返回 items: [{ snapshot_time: '...', total_number: 100 }, ...]
-      const dates = res.data.items.map(i => i.snapshot_time);
-      const values = res.data.items.map(i => i.total_number);
+    // 🟢 调试：你可以取消注释下面这行，在控制台看看真实数据
+    // console.log('历史趋势数据:', res);
+
+    if (res.code === 200 && res.data) {
+      // 🟢 修复点 1：兼容两种结构
+      // 优先取 res.data.snapshots.items (你刚才发的结构)
+      // 如果没有，再尝试 res.data.items (旧结构)
+      // 如果都没有，给个空数组
+      let items = [];
+      if (res.data.snapshots && res.data.snapshots.items) {
+        items = res.data.snapshots.items;
+      } else if (res.data.items) {
+        items = res.data.items;
+      }
+
+      if (items.length === 0) {
+        // 如果没数据，清空图表
+        chartOptions.xAxis.data = [];
+        chartOptions.series[0].data = [];
+        return;
+      }
+
+      // 🟢 修复点 2：简单的日期格式化，让 X 轴好看点
+      const dates = items.map(i => dayjs(i.snapshot_time).format('MM-DD HH:mm'));
+      const values = items.map(i => i.total_number);
       
       chartOptions.xAxis.data = dates;
       chartOptions.series[0].data = values;
@@ -256,12 +297,13 @@ const loadHistory = async () => {
     console.error('加载历史趋势失败:', e);
   }
 };
-
 const handleRefresh = () => {
   loadData();
 };
 
 const handleTabChange = (name) => {
+  // 切换 tab 时，如果切到了趋势图，才去加载数据
+  // v-if 会在这里生效，DOM 创建后 ECharts 会自动初始化
   if (name === 'trend') {
     loadHistory();
   }
@@ -272,44 +314,189 @@ const goBack = () => {
 };
 
 onMounted(() => {
+  // 🟢 5. 确保 Store 有数据，否则仓库名显示 ID
+  if (warehouseStore.warehouseList.length === 0) {
+    warehouseStore.fetchWarehouses();
+  }
   loadData();
 });
 </script>
 
 <style scoped>
 /* 样式保留 */
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.ml-10 { margin-left: 10px; }
-.header-bar { color: #fff; }
-:deep(.el-page-header__left) { color: #fff !important; }
-:deep(.el-page-header__left:hover) { color: #409EFF !important; }
-:deep(.el-page-header__content) { color: #fff !important; }
-.info-card { background: #1d1e1f; border: 1px solid #333; color: #fff; }
-.img-box { background: #262729; height: 120px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
-.item-header { display: flex; align-items: center; margin-bottom: 20px; }
-.item-header h2 { margin: 0; }
-:deep(.el-descriptions__body) { background: transparent !important; }
-:deep(.el-descriptions__label) { background: #262729 !important; color: #909399 !important; font-weight: bold; }
-:deep(.el-descriptions__content) { background: transparent !important; color: #fff !important; }
-.kpi-card { background: #1d1e1f; border: 1px solid #333; color: #fff; text-align: center; height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-.kpi-card .label { color: #909399; font-size: 13px; }
-.kpi-card .value { font-size: 28px; font-weight: bold; margin: 5px 0; }
-.kpi-card .sub { font-size: 12px; color: #909399; margin-top: -5px; }
-.value.primary { color: #409EFF; }
-.value.success { color: #67C23A; }
-.value.warning { color: #E6A23C; }
-.value.info { color: #909399; }
-.box-card { background: #1d1e1f; border: 1px solid #333; color: #fff; }
-.history-card { background: #262729; border: 1px solid #333; color: #cfd3dc; padding: 10px; }
-.text-success { color: #67C23A; font-weight: bold; }
-.text-danger { color: #F56C6C; font-weight: bold; }
-:deep(.el-tabs__item) { color: #cfd3dc; }
-:deep(.el-tabs__item.is-active) { color: #409EFF; }
-:deep(.el-table), :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) { background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important; }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; }
-:deep(.el-table__inner-wrapper::before) { display: none !important; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.header-bar {
+  color: #fff;
+}
+
+:deep(.el-page-header__left) {
+  color: #fff !important;
+}
+
+:deep(.el-page-header__left:hover) {
+  color: #409EFF !important;
+}
+
+:deep(.el-page-header__content) {
+  color: #fff !important;
+}
+
+.info-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+}
+
+.img-box {
+  background: #262729;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.item-header h2 {
+  margin: 0;
+}
+
+:deep(.el-descriptions__body) {
+  background: transparent !important;
+}
+
+:deep(.el-descriptions__label) {
+  background: #262729 !important;
+  color: #909399 !important;
+  font-weight: bold;
+}
+
+:deep(.el-descriptions__content) {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+.kpi-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+  text-align: center;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.kpi-card .label {
+  color: #909399;
+  font-size: 13px;
+}
+
+.kpi-card .value {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.kpi-card .sub {
+  font-size: 12px;
+  color: #909399;
+  margin-top: -5px;
+}
+
+.value.primary {
+  color: #409EFF;
+}
+
+.value.success {
+  color: #67C23A;
+}
+
+.value.warning {
+  color: #E6A23C;
+}
+
+.value.info {
+  color: #909399;
+}
+
+.box-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #fff;
+}
+
+.history-card {
+  background: #262729;
+  border: 1px solid #333;
+  color: #cfd3dc;
+  padding: 10px;
+}
+
+.text-success {
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.text-danger {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
+:deep(.el-tabs__item) {
+  color: #cfd3dc;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #409EFF;
+}
+
+:deep(.el-table),
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  color: #cfd3dc;
+  border-bottom: 1px solid #333 !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+}
+
+:deep(.el-table__inner-wrapper::before) {
+  display: none !important;
+}
+
 /* 单选按钮样式适配 */
-:deep(.el-radio-button__inner) { background: #262729; border-color: #4c4d4f; color: #cfd3dc; box-shadow: none; }
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #409EFF; border-color: #409EFF; color: #fff; }
+:deep(.el-radio-button__inner) {
+  background: #262729;
+  border-color: #4c4d4f;
+  color: #cfd3dc;
+  box-shadow: none;
+}
+
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+  color: #fff;
+}
 </style>

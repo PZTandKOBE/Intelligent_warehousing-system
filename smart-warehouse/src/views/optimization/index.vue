@@ -72,8 +72,11 @@
         
         <el-table-column label="操作" width="230" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" :icon="View" @click="goDetail(row)">查看详情</el-button>
-            <el-button link type="primary" :icon="Download" @click="handleExport(row)">导出方案</el-button>
+              <el-button link type="primary" :icon="View" @click="goDetail(row)">查看详情</el-button>
+              <el-button link type="primary" :icon="Download" @click="handleExport(row)"
+                :disabled="row.status !== 'COMPLETED'" :title="row.status !== 'COMPLETED' ? '方案执行完成后方可导出报告' : ''">
+                导出方案
+              </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -181,17 +184,30 @@ const goDetail = (row) => {
   router.push(`/optimization/plans/${row.plan_id}`);
 };
 
+// src/views/optimization/index.vue
+
 const handleExport = async (row) => {
   try {
     ElMessage.info('正在获取方案报告...');
     const detailRes = await getOptimizationPlanReport(row.plan_id);
     
-    if (detailRes.code !== 200 || !detailRes.data.report || !detailRes.data.report.report_id) {
+    // 🔍 调试：你可以打印一下看看结构
+    console.log('报告详情返回:', detailRes);
+
+    // 🔴 [修改点 1]：修正判断逻辑
+    // 原代码：if (detailRes.code !== 200 || !detailRes.data.report || !detailRes.data.report.report_id) {
+    // 新代码：直接检查 data 下是否有 report_id (兼容 flat 结构)
+    // 为了稳健，我们同时兼容“有 report 对象”和“无 report 对象”两种情况
+    const reportData = detailRes.data.report || detailRes.data; // 优先取 report，取不到就取 data 本身
+
+    if (detailRes.code !== 200 || !reportData || !reportData.report_id) {
       ElMessage.warning('该方案尚未生成分析报告，无法导出');
       return;
     }
 
-    const reportId = detailRes.data.report.report_id;
+    // 🔴 [修改点 2]：获取正确的 ID
+    const reportId = reportData.report_id;
+
     ElMessage.info('正在请求下载链接...');
     const exportRes = await exportReport(reportId, 'PDF');
     
