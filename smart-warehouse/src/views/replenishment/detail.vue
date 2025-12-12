@@ -95,7 +95,7 @@ const getUrgencyType = (urgency) => {
 };
 
 const getUrgencyLabel = (urgency) => {
-  const map = { 'CRITICAL': '极高', 'HIGH': '紧急', 'MEDIUM': '一般', 'LOW': '低' };
+  const map = { 'CRITICAL': '临界', 'HIGH': '紧急', 'MEDIUM': '一般', 'LOW': '低' };
   return map[urgency] || urgency || '-';
 };
 

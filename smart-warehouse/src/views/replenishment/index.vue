@@ -22,6 +22,7 @@
         </el-form-item>
         <el-form-item label="紧急度">
           <el-select v-model="filters.urgency" placeholder="全部" style="width: 100px" clearable>
+            <el-option label="临界" value="CRITICAL" />
             <el-option label="高" value="HIGH" />
             <el-option label="中" value="MEDIUM" />
             <el-option label="低" value="LOW" />
@@ -123,9 +124,9 @@
             effect="dark"
             show-icon 
             :closable="false"
-            style="margin-bottom: 15px;"
+            style="margin-bottom: 15px; flex: 1; margin-right: 20px;"
           />
-          <el-form :inline="true" :model="configFilters" class="search-form">
+          <el-form :inline="true" :model="configFilters" class="search-form" style="flex-shrink: 0;">
             <el-form-item>
               <el-input 
                 v-model="configFilters.keyword" 
@@ -164,8 +165,8 @@
           height="400"
           style="width: 100%;margin-bottom: 20px;"
         >
-          <el-table-column prop="goods_code" label="商品编码" width="140" />
-          <el-table-column prop="goods_name" label="商品名称" min-width="150" />
+          <el-table-column prop="goods_code" label="商品编码" width="140" show-overflow-tooltip />
+          <el-table-column prop="goods_name" label="商品名称" min-width="150" show-overflow-tooltip />
           <el-table-column label="所属仓库" width="120" align="center">
             <template #default="{ row }">
               {{ getWarehouseName(row.warehouse_id) }}
@@ -211,11 +212,13 @@ import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Setting } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { getReplenishmentList, getReplenishmentConfigList, updateReplenishmentConfig } from '@/api/replenishment';
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { getReplenishmentList } from '@/api/replenishment';
+// ✅ 新增引入 getInventoryList 用于获取真实商品
+import { getInventoryList } from '@/api/inventory';
+import { useWarehouseStore } from '@/stores/warehouse'; 
 
 const router = useRouter();
-const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+const warehouseStore = useWarehouseStore(); 
 
 const loading = ref(false);
 const total = ref(0);
@@ -229,6 +232,7 @@ const filters = reactive({
   page_size: 10
 });
 
+// --- 配置弹窗相关状态 ---
 const configDialogVisible = ref(false);
 const configLoading = ref(false);
 const configTotal = ref(0);
@@ -242,63 +246,87 @@ const configFilters = reactive({
 
 const openConfigDialog = () => {
   configDialogVisible.value = true;
+  // 打开时加载商品列表
   loadConfigList();
 };
 
+// 🟢 加载配置列表 (对接真实库存接口)
 const loadConfigList = async () => {
   configLoading.value = true;
   try {
-    // 模拟数据 (这里保留模拟，但 ID 对接真实仓库ID)
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // 为了演示效果，随机分配一个真实的仓库ID（如果列表为空则默认1）
-    const defaultWhId = warehouseStore.warehouseList.length > 0 ? warehouseStore.warehouseList[0].warehouse_id : 1;
+    // 构造查询参数 (复用库存列表的智能搜索逻辑)
+    let codeParam = undefined;
+    let nameParam = undefined;
     
-    const mockData = Array.from({ length: 10 }).map((_, idx) => ({
-      id: idx,
-      goods_code: `MAT-CONFIG-${1000 + idx}`,
-      goods_name: `模拟商品 ${idx + 1}`,
-      warehouse_id: defaultWhId, 
-      enabled: idx % 3 !== 0,
-      switching: false
-    }));
+    if (configFilters.keyword) {
+      if (/^[0-9]+$/.test(configFilters.keyword) || configFilters.keyword.toUpperCase().startsWith('MAT-')) {
+         codeParam = configFilters.keyword;
+      } else {
+         nameParam = configFilters.keyword;
+      }
+    }
+
+    const params = {
+      page: configFilters.page,
+      page_size: configFilters.page_size,
+      warehouse_id: configFilters.warehouse_id || undefined,
+      goods_code: codeParam,
+      goods_name: nameParam
+    };
+
+    // 调用真实接口获取商品
+    const res = await getInventoryList(params);
     
-    configTableData.value = mockData;
-    configTotal.value = 50; 
+    if (res.code === 200) {
+      // 映射数据，并添加模拟的 enabled 状态
+      configTableData.value = (res.data.items || []).map(item => ({
+        id: item.goods_id,
+        goods_code: item.goods_code,
+        goods_name: item.goods_name,
+        warehouse_id: item.warehouse_id,
+        enabled: true, // ⚠️ 默认全部开启 (模拟状态)
+        switching: false
+      }));
+      configTotal.value = res.data.total;
+    }
   } catch (error) {
     console.error(error);
-    ElMessage.error('加载配置列表失败');
+    ElMessage.error('加载商品列表失败');
   } finally {
     configLoading.value = false;
   }
 };
 
+// 🟡 开关切换 (纯前端模拟，不调后端)
 const handleConfigChange = async (row) => {
   row.switching = true;
   try {
+    // 模拟网络延迟效果
     await new Promise(resolve => setTimeout(resolve, 600));
-    ElMessage.success(`${row.goods_name} 预测功能已${row.enabled ? '开启' : '关闭'}`);
+    ElMessage.success(`${row.goods_name} 预测配置已更新`);
   } catch (error) {
     console.error(error);
-    row.enabled = !row.enabled; 
-    ElMessage.error('设置失败，请稍后重试');
+    row.enabled = !row.enabled; // 回滚状态
+    ElMessage.error('设置失败');
   } finally {
     row.switching = false;
   }
 };
 
-// ✅ 修改：从 Store 获取名称
+// --- 通用 Helper 函数 ---
+
 const getWarehouseName = (id) => {
   const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
   return found ? found.warehouse_name : `WH-${id}`;
 };
 
 const getUrgencyLabel = (val) => {
-  const map = { 'HIGH': '高', 'MEDIUM': '中', 'LOW': '低' };
+  const map = { 'CRITICAL': '临界', 'HIGH': '高', 'MEDIUM': '中', 'LOW': '低' };
   return map[val] || val;
 };
 
 const getUrgencyTag = (val) => {
-  const map = { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info' };
+  const map = { 'CRITICAL': 'danger', 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info' };
   return map[val] || 'info';
 };
 
@@ -346,13 +374,12 @@ const goDetail = (row) => {
   router.push({
     path: `/replenishment/recommendations/${row.recommendation_id}`,
     query: { 
-      warehouse_id: row.warehouse_id  // 把当前行的仓库ID传过去
+      warehouse_id: row.warehouse_id 
     }
   });
 };
 
 onMounted(() => {
-  // ✅ 加载仓库
   warehouseStore.fetchWarehouses();
   loadData();
 });

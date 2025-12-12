@@ -13,6 +13,17 @@ export function getInventoryList(params) {
 }
 
 /**
+ * 获取物料分类列表
+ */
+export function getGoodsCategories() {
+  return request({
+    url: '/api/v1/common/goods-categories',
+    method: 'get'
+  })
+}
+
+
+/**
  * 获取库存详情
  */
 export function getInventoryDetail(goodsId) {

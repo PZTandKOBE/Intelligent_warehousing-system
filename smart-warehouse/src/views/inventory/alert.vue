@@ -86,7 +86,11 @@
             {{ getWarehouseName(row.warehouse_id) }}
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="触发时间" width="160" />
+        <el-table-column prop="created_at" label="触发时间" width="160">
+          <template #default="{ row }">
+             {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
         
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
@@ -123,49 +127,86 @@
           <div class="sub-row">
             <span>预警ID: {{ currentAlert.alert_id }}</span>
             <el-divider direction="vertical" />
-            <span>触发时间: {{ currentAlert.created_at || '-' }}</span>
+            <span>触发时间: {{ formatTime(currentAlert.created_at) }}</span>
           </div>
         </div>
 
         <el-card shadow="never" class="detail-card mb-20">
           <template #header>📸 库存快照 (Snapshot)</template>
-          <el-descriptions :column="2" border class="custom-desc" v-if="currentAlert.stock_snapshot">
+          <el-descriptions :column="2" border class="custom-desc">
             <el-descriptions-item label="当前库存">
-              <span class="text-highlight">{{ currentAlert.stock_snapshot.current_stock }}</span>
+              <span class="text-highlight">{{ currentAlert.current_stock }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="安全库存">
-              {{ currentAlert.stock_snapshot.safety_stock }}
+              {{ currentAlert.safety_stock }}
             </el-descriptions-item>
             <el-descriptions-item label="缺口/冗余">
-              <span class="text-danger">{{ currentAlert.stock_snapshot.gap }}</span>
+              <span class="text-danger font-bold">{{ currentAlert.gap }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="日均消耗">
-              {{ currentAlert.stock_snapshot.avg_daily_consumption }} /天
-            </el-descriptions-item>
-            <el-descriptions-item label="预计耗尽">
-              <span class="text-danger font-bold">{{ currentAlert.stock_snapshot.predicted_depletion_date }}</span>
+            <el-descriptions-item label="分析结论">
+              <span class="text-warning">{{ currentAlert.reason || '库存异常' }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
 
-        <div class="analysis-section mb-20">
-          <h4 class="section-title"><el-icon><DataAnalysis /></el-icon> 触发原因分析</h4>
-          <div class="analysis-text">
-            {{ currentAlert.reason }}
-          </div>
-        </div>
-
         <div class="suggestion-section">
-          <h4 class="section-title"><el-icon><MagicStick /></el-icon> AI 处理建议</h4>
-          <div v-for="(sug, idx) in currentAlert.suggestions" :key="idx" class="mb-5">
-             <el-alert :title="sug" type="warning" :closable="false" effect="dark" />
+          <h4 class="section-title"><el-icon><MagicStick /></el-icon> AI 智能决策建议</h4>
+          
+          <div v-if="currentAlert.suggestions && currentAlert.suggestions.action" class="ai-suggestion-box">
+            
+            <div class="suggestion-header">
+              <span class="suggestion-action">
+                <el-icon class="mr-5"><VideoPlay /></el-icon> 
+                {{ currentAlert.suggestions.action }}
+              </span>
+              <el-tag :type="getUrgencyTag(currentAlert.suggestions.urgency)" effect="dark" size="small">
+                {{ getUrgencyLabel(currentAlert.suggestions.urgency) }} 级
+              </el-tag>
+            </div>
+
+            <div class="suggestion-body">
+              <p class="suggestion-reason">{{ currentAlert.suggestions.reason }}</p>
+              
+              <div class="suggestion-metrics">
+                
+                <template v-if="currentAlert.alert_type === 'LOW_STOCK'">
+                  <div class="metric-item">
+                    <div class="label">推荐补货量</div>
+                    <div class="value text-success">+{{ currentAlert.suggestions.recommended_quantity || '-' }}</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="label">预计耗时</div>
+                    <div class="value">{{ currentAlert.suggestions.estimated_days || '-' }} 天</div>
+                  </div>
+                </template>
+
+                <template v-else-if="currentAlert.alert_type === 'STAGNANT'">
+                  <div class="metric-item" v-if="currentAlert.suggestions.discount">
+                    <div class="label">建议折扣</div>
+                    <div class="value text-warning">{{ currentAlert.suggestions.discount }}</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="label">预计清理周期</div>
+                    <div class="value">{{ currentAlert.suggestions.estimated_days || '3' }} 天内</div>
+                  </div>
+                </template>
+
+              </div>
+              
+              </div>
+
+            <div class="suggestion-footer">
+               <el-button type="primary" size="default" @click="handleAction(currentAlert.suggestions)">
+                 执行: {{ currentAlert.suggestions.action }}
+               </el-button>
+            </div>
+
           </div>
           
-          <div class="action-buttons mt-20">
-            <el-button type="primary" v-if="currentAlert.alert_type === 'LOW_STOCK'">生成补货申请</el-button>
-            <el-button type="warning" v-else>发起呆滞促销</el-button>
-            <el-button @click="drawerVisible = false">暂不处理</el-button>
+          <div v-else class="empty-suggestion">
+            <el-empty description="暂无智能建议" :image-size="60" />
           </div>
+
         </div>
       </div>
     </el-drawer>
@@ -174,11 +215,12 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
-import { Warning, Refresh, DataAnalysis, MagicStick } from '@element-plus/icons-vue';
+import { Warning, Refresh, MagicStick, VideoPlay } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { getInventoryAlerts, getInventoryAlertDetail } from '@/api/inventory';
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { useWarehouseStore } from '@/stores/warehouse';
 
-const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+const warehouseStore = useWarehouseStore();
 
 const loading = ref(false);
 const drawerLoading = ref(false);
@@ -195,7 +237,6 @@ const alertList = ref([]);
 const drawerVisible = ref(false);
 const currentAlert = ref(null);
 
-// ✅ 修改：从 Store 获取仓库名
 const getWarehouseName = (id) => {
   const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
   return found ? found.warehouse_name : `WH-${id}`;
@@ -205,6 +246,29 @@ const getLevelTag = (level) => {
   if (level === 'HIGH') return 'danger';
   if (level === 'MEDIUM') return 'warning';
   return 'info';
+};
+
+// 紧急度中文映射
+const getUrgencyLabel = (val) => {
+  const map = { 
+    'CRITICAL': '临界', 
+    'HIGH': '高', 
+    'MEDIUM': '中', 
+    'LOW': '低' 
+  };
+  return map[val] || val;
+};
+
+// 紧急度颜色映射
+const getUrgencyTag = (val) => {
+  if (val === 'CRITICAL' || val === 'HIGH') return 'danger';
+  if (val === 'MEDIUM') return 'warning';
+  return 'info';
+};
+
+const formatTime = (timeStr) => {
+  if(!timeStr) return '-';
+  return timeStr.replace('T', ' ').substring(0, 19);
 };
 
 const loadData = async () => {
@@ -236,65 +300,146 @@ const openDrawer = async (row) => {
   try {
     const res = await getInventoryAlertDetail(row.alert_id);
     if (res.code === 200) {
+      // 直接使用后端返回的扁平结构
       currentAlert.value = res.data;
     }
   } catch (e) {
     console.error(e);
+    ElMessage.error('获取详情失败');
   } finally {
     drawerLoading.value = false;
   }
 };
 
+const handleAction = (suggestion) => {
+  ElMessage.success(`已发起: ${suggestion.action}`);
+};
+
 onMounted(() => {
-  // ✅ 加载仓库列表
   warehouseStore.fetchWarehouses();
   loadData();
 });
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .page-container { padding: 20px; }
 .mb-20 { margin-bottom: 20px; }
-.mb-5 { margin-bottom: 5px; }
-.mt-20 { margin-top: 20px; }
-.font-bold { font-weight: bold; }
-.text-primary { color: #409EFF; }
-.text-danger { color: #F56C6C; }
-.text-warning { color: #E6A23C; }
-.text-success { color: #67C23A; }
-.text-gray { color: #909399; }
-.text-highlight { color: #fff; font-size: 16px; font-weight: bold; }
+.mr-5 { margin-right: 5px; }
+
+/* 统计卡片 */
 .stat-card { background-color: #1d1e1f; border: 1px solid #333; color: #fff; }
 .stat-card :deep(.el-card__body) { display: flex; justify-content: space-between; align-items: center; padding: 20px; }
 .stat-icon { font-size: 40px; opacity: 0.8; }
 .stat-title { font-size: 14px; color: #909399; }
 .stat-num { font-size: 24px; font-weight: bold; margin-top: 5px; }
+
+/* 筛选与列表 */
 .main-card { background-color: #1d1e1f; border: 1px solid #333; min-height: 500px; }
 .filter-bar { display: flex; justify-content: space-between; align-items: center; }
 .left-filters { display: flex; align-items: center; }
 .custom-radio-group { margin-left: 10px; }
 .custom-radio-group :deep(.el-radio-button__inner) { background-color: #262729 !important; border-color: #4c4d4f !important; color: #cfd3dc !important; box-shadow: none !important; }
 .custom-radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #409EFF !important; border-color: #409EFF !important; color: #fff !important; box-shadow: -1px 0 0 0 #409EFF !important; }
-.custom-radio-group :deep(.el-radio-button__inner:hover) { color: #409EFF !important; }
+
+/* 表格样式 */
 :deep(.el-table) { background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333; --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50; }
 :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) { background-color: transparent !important; }
 :deep(.el-table th.el-table__cell) { color: #fff; font-weight: bold; }
+.text-primary { color: #409EFF; }
+.text-danger { color: #F56C6C; }
+.text-warning { color: #E6A23C; }
+.text-success { color: #67C23A; }
+.text-gray { color: #909399; }
+.font-bold { font-weight: bold; }
+.sub-text { font-size: 12px; color: #909399; }
+.stock-compare { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+
+/* 详情抽屉样式 */
+:deep(.alert-drawer) { background-color: #1d1e1f !important; border-left: 1px solid #333; }
+:deep(.alert-drawer .el-drawer__header) { margin-bottom: 0; border-bottom: 1px solid #333; color: #fff; }
+:deep(.alert-drawer .el-drawer__title) { color: #fff; font-weight: bold; }
 .drawer-content { padding: 0 10px; }
 .alert-header { border-bottom: 1px solid #333; padding-bottom: 15px; }
 .header-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
 .alert-title { margin: 0; font-size: 20px; color: #fff; }
 .sub-row { font-size: 12px; color: #909399; display: flex; align-items: center; }
+
+/* 快照卡片 */
 .detail-card { background: #262729; border: 1px solid #333; color: #fff; }
 :deep(.detail-card .el-card__header) { border-bottom: 1px solid #333; padding: 10px 15px; font-size: 14px; font-weight: bold; }
 :deep(.custom-desc .el-descriptions__label) { background: #1d1e1f !important; color: #909399; }
 :deep(.custom-desc .el-descriptions__content) { background: #1d1e1f !important; color: #fff; }
-.section-title { margin: 0 0 10px 0; color: #fff; font-size: 15px; display: flex; align-items: center; gap: 5px; }
-.analysis-text { background: rgba(64, 158, 255, 0.1); padding: 15px; border-radius: 4px; color: #cfd3dc; line-height: 1.6; border: 1px solid rgba(64, 158, 255, 0.2); }
-.action-buttons { display: flex; gap: 10px; }
-:deep(.alert-drawer) { background-color: #1d1e1f !important; border-left: 1px solid #333; }
-:deep(.alert-drawer .el-drawer__header) { margin-bottom: 0; border-bottom: 1px solid #333; color: #fff; }
-:deep(.alert-drawer .el-drawer__title) { color: #fff; font-weight: bold; }
+.text-highlight { color: #fff; font-size: 16px; font-weight: bold; }
+
+/* AI 建议卡片 */
+.section-title { margin: 10px 0 15px 0; color: #fff; font-size: 15px; display: flex; align-items: center; gap: 5px; }
+.ai-suggestion-box {
+  background: linear-gradient(145deg, #1f2a38, #161b22);
+  border: 1px solid #3a4d63;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 1px dashed #3a4d63;
+  padding-bottom: 10px;
+}
+
+.suggestion-action {
+  font-size: 16px;
+  font-weight: bold;
+  color: #409EFF;
+  display: flex;
+  align-items: center;
+}
+
+.suggestion-reason {
+  font-size: 14px;
+  color: #cfd3dc;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.suggestion-metrics {
+  display: flex;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-item .label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 2px;
+}
+
+.metric-item .value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.suggestion-footer {
+  margin-top: 15px;
+  text-align: right;
+}
+
+.empty-suggestion {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 20px;
+}
 :deep(.el-select__wrapper) { background-color: #262729 !important; box-shadow: 0 0 0 1px #4c4d4f inset !important; }
 :deep(.el-select__placeholder) { color: #cfd3dc; }
 </style>

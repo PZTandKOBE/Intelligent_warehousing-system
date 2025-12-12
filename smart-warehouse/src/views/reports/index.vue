@@ -17,13 +17,14 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="报告类型">
+      <el-form-item label="报告类型">
           <el-select v-model="filters.type" placeholder="全部类型" style="width: 160px" clearable>
-             <el-option label="运营日报" value="DAILY" />
-             <el-option label="运营周报" value="WEEKLY" />
-             <el-option label="运营月报" value="MONTHLY" />
-             <el-option label="优化报告" value="OPTIMIZATION" />
-             <el-option label="补货报告" value="REPLENISHMENT" />
+            <el-option label="运营日报" value="DAILY" />
+            <el-option label="运营周报" value="WEEKLY" />
+            <el-option label="运营月报" value="MONTHLY" />
+            <el-option label="优化报告" value="OPTIMIZATION" />
+            <el-option label="补货报告" value="REPLENISHMENT" />
+            <el-option label="自定义报告" value="CUSTOM" />
           </el-select>
         </el-form-item>
         <el-form-item label="时间范围">
@@ -67,12 +68,12 @@
         <el-table-column prop="title" label="报告标题" min-width="250" show-overflow-tooltip />
         
         <el-table-column prop="status" label="状态" width="100" align="center">
-           <template #default="{ row }">
-              <el-tag size="small" :type="row.status === 'COMPLETED' ? 'success' : 'info'" effect="plain">
-                {{ row.status === 'COMPLETED' ? '已生成' : (row.status || '生成中') }}
-              </el-tag>
-           </template>
-        </el-table-column>
+            <template #default="{ row }">
+                <el-tag size="small" :type="getReportStatusTag(row.status)" effect="plain">
+                  {{ getReportStatusLabel(row.status) }}
+                </el-tag>
+            </template>
+          </el-table-column>
 
         <el-table-column prop="created_at" label="创建时间" width="180" align="center" />
         
@@ -136,18 +137,45 @@ const getReportTypeLabel = (type) => {
     'WEEKLY': '运营周报', 
     'MONTHLY': '运营月报', 
     'OPTIMIZATION': '优化报告', 
-    'REPLENISHMENT': '补货报告' 
+    'REPLENISHMENT': '补货报告',
+    'CUSTOM': '自定义报告' 
   };
   return map[type] || type;
 };
-
+// 2. 修改颜色映射
 const getReportTypeTag = (type) => {
-  if (['DAILY', 'WEEKLY', 'MONTHLY'].includes(type)) return 'info';
+  // 基础周期报告用 info (灰色)
+  if (['DAILY', 'WEEKLY', 'MONTHLY'].includes(type)) return 'warning';
+  // 业务专项报告用 primary (蓝色) / warning (橙色)
   if (type === 'OPTIMIZATION') return 'primary';
   if (type === 'REPLENISHMENT') return 'warning';
+  // ✅ 自定义报告用 success (绿色)，突出显示
+  if (type === 'CUSTOM') return 'success';
+  
   return 'info';
 };
 
+const getReportStatusLabel = (status) => {
+  const map = {
+    'PUBLISHED': '已发布',
+    'PENDING': '排队中',
+    'GENERATING': '生成中',
+    'PROCESSING': '生成中', // 兼容可能的字段
+    'COMPLETED': '已生成',
+    'FAILED': '生成失败'
+  };
+  return map[status] || status; // 未知状态显示原值
+};
+
+
+const getReportStatusTag = (status) => {
+  if (status === 'COMPLETED') return 'success';   // 绿色
+  if (status === 'PUBLISHED') return '';      // 蓝色
+  if (status === 'FAILED') return 'danger';       // 红色
+  if (status === 'GENERATING' || status === 'PROCESSING') return 'primary'; // 蓝色
+  if (status === 'PENDING') return 'warning';     // 橙色
+  return 'info'; // 灰色
+};
 const loadData = async () => {
   loading.value = true;
   try {

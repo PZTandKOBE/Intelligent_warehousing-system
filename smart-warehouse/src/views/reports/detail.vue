@@ -25,11 +25,11 @@
           </el-tag>
         </el-descriptions-item>
         
-        <el-descriptions-item label="生成状态">
-          <el-tag :type="reportData.status === 'COMPLETED' || reportData.status === 'PUBLISHED' ? 'success' : 'info'" effect="plain">
-            {{ getStatusLabel(reportData.status) }}
-          </el-tag>
-        </el-descriptions-item>
+        <el-descriptions-item label="当前状态">
+            <el-tag :type="getReportStatusTag(reportData.status)" size="small">
+              {{ getReportStatusLabel(reportData.status) }}
+            </el-tag>
+          </el-descriptions-item>
 
         <el-descriptions-item label="邮件通知">
           <span :class="reportData.email_sent ? 'text-success' : 'text-gray'">
@@ -85,20 +85,44 @@ const exportLoading = ref(false);
 const reportData = ref({});
 
 const getReportTypeLabel = (type) => {
-  const map = { 'DAILY': '运营日报', 'WEEKLY': '运营周报', 'MONTHLY': '运营月报', 'OPTIMIZATION': '优化报告', 'REPLENISHMENT': '补货报告', 'CUSTOM': '自定义报告' };
-  return map[type] || type || '未知';
+  const map = { 
+    'DAILY': '运营日报', 
+    'WEEKLY': '运营周报', 
+    'MONTHLY': '运营月报', 
+    'OPTIMIZATION': '优化报告', 
+    'REPLENISHMENT': '补货报告',
+    'CUSTOM': '自定义报告' // ✅ 同步新增
+  };
+  return map[type] || type;
 };
 
 const getReportTypeTag = (type) => {
   if (['DAILY', 'WEEKLY', 'MONTHLY'].includes(type)) return 'info';
   if (type === 'OPTIMIZATION') return 'primary';
   if (type === 'REPLENISHMENT') return 'warning';
+  if (type === 'CUSTOM') return 'success'; // ✅ 同步新增
   return 'info';
 };
 
-const getStatusLabel = (status) => {
-  const map = { 'COMPLETED': '已生成', 'PUBLISHED': '已发布', 'PENDING': '生成中' };
+const getReportStatusLabel = (status) => {
+  const map = {
+    'PUBLISHED': '已发布',
+    'PENDING': '排队中',
+    'GENERATING': '生成中',
+    'PROCESSING': '生成中',
+    'COMPLETED': '已生成',
+    'FAILED': '生成失败'
+  };
   return map[status] || status;
+};
+
+const getReportStatusTag = (status) => {
+  if (status === 'PUBLISHED') return '';
+  if (status === 'COMPLETED') return 'success';
+  if (status === 'FAILED') return 'danger';
+  if (status === 'GENERATING' || status === 'PROCESSING') return 'primary';
+  if (status === 'PENDING') return 'warning';
+  return 'info';
 };
 
 // 计算属性：提取 HTML 内容

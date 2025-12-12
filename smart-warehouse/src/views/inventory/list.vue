@@ -5,19 +5,29 @@
         <el-form-item label="关键词">
           <el-input 
             v-model="searchForm.keyword" 
-            placeholder="商品编码 / 名称" 
+            placeholder="输入商品编码 或 名称" 
             :prefix-icon="Search"
             clearable 
-            style="width: 200px"
+            style="width: 220px"
             @keyup.enter="handleSearch"
+            @clear="handleSearch"
           />
         </el-form-item>
         
         <el-form-item label="物料分类">
-          <el-select v-model="searchForm.category" placeholder="全部分类" style="width: 140px" clearable>
-            <el-option label="电子元器件" value="Electronics" />
-            <el-option label="机械配件" value="Mechanical" />
-            <el-option label="辅料耗材" value="Consumables" />
+          <el-select 
+            v-model="searchForm.category" 
+            placeholder="全部分类" 
+            style="width: 160px" 
+            clearable
+            @change="handleSearch"
+          >
+            <el-option 
+              v-for="item in categoryOptions"
+              :key="item.goods_type"
+              :label="item.goods_type_name"
+              :value="item.goods_type" 
+            />
           </el-select>
         </el-form-item>
 
@@ -25,8 +35,9 @@
           <el-select 
             v-model="searchForm.warehouse_id" 
             placeholder="全部仓库" 
-            style="width: 140px" 
+            style="width: 160px" 
             clearable
+            @change="handleSearch"
           >
             <el-option 
               v-for="item in warehouseStore.warehouseList"
@@ -35,17 +46,6 @@
               :value="item.warehouse_id"
             />
           </el-select>
-        </el-form-item>
-
-        <el-form-item label="快照日期">
-          <el-date-picker
-            v-model="searchForm.snapshot_date"
-            type="date"
-            placeholder="选择日期"
-            value-format="YYYY-MM-DD"
-            style="width: 160px"
-            @change="handleSearch"
-          />
         </el-form-item>
 
         <el-form-item>
@@ -79,6 +79,8 @@
           </template>
         </el-table-column>
         
+        <el-table-column prop="goods_type_name" label="分类" width="120" show-overflow-tooltip />
+
         <el-table-column label="位置信息" width="180">
           <template #default="{ row }">
             <div>{{ getWarehouseName(row.warehouse_id) }}</div>
@@ -108,7 +110,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="snapshot_time" label="快照时间" width="170" align="center" show-overflow-tooltip />
+        <el-table-column prop="snapshot_time" label="更新时间" width="170" align="center" show-overflow-tooltip />
         
         <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
@@ -141,7 +143,8 @@ import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx'; 
 import jsPDF from 'jspdf';     
 import autoTable from 'jspdf-autotable'; 
-import { getInventoryList } from '@/api/inventory';
+// 引入新增的 getGoodsCategories
+import { getInventoryList, getGoodsCategories } from '@/api/inventory';
 import { useWarehouseStore } from '@/stores/warehouse';
 
 const router = useRouter();
@@ -150,12 +153,12 @@ const warehouseStore = useWarehouseStore();
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref([]);
+const categoryOptions = ref([]); // 存储真实的分类数据
 
 const searchForm = reactive({
   keyword: '',
   category: '',
   warehouse_id: '',
-  snapshot_date: '',
   page: 1,
   page_size: 10
 });
@@ -165,16 +168,46 @@ const getWarehouseName = (id) => {
   return found ? found.warehouse_name : `WH-${id}`;
 };
 
+// 1. 加载分类列表
+const loadCategories = async () => {
+  try {
+    const res = await getGoodsCategories();
+    if (res.code === 200) {
+      // 假设后端返回结构 { data: { items: [...] } }
+      categoryOptions.value = res.data.items || [];
+    }
+  } catch (error) {
+    console.error('获取分类失败:', error);
+  }
+};
+
+// 2. 加载库存列表
 const loadData = async () => {
   loading.value = true;
   try {
+    // 处理关键词逻辑：如果没填，就是 undefined
+    let codeParam = undefined;
+    let nameParam = undefined;
+    
+    // 简单的智能判断：如果关键词存在
+    if (searchForm.keyword) {
+      // 如果看起来像编码（例如纯数字或包含特定前缀），传给 code
+      // 这里简单假设：如果是纯数字或者以 'MAT-' 开头，可能是编码
+      // 否则默认作为名称查询
+      if (/^[0-9]+$/.test(searchForm.keyword) || searchForm.keyword.toUpperCase().startsWith('MAT-')) {
+         codeParam = searchForm.keyword;
+      } else {
+         nameParam = searchForm.keyword;
+      }
+    }
+
     const params = {
       page: searchForm.page,
       page_size: searchForm.page_size,
       warehouse_id: searchForm.warehouse_id || undefined,
-      goods_name: searchForm.keyword || undefined,
-      goods_type: searchForm.category || undefined,
-      snapshot_date: searchForm.snapshot_date || undefined
+      goods_type: searchForm.category || undefined, // 传递选中的分类值
+      goods_code: codeParam, // 对应后端 goods_code
+      goods_name: nameParam  // 对应后端 goods_name
     };
 
     const res = await getInventoryList(params);
@@ -198,7 +231,6 @@ const resetSearch = () => {
   searchForm.keyword = '';
   searchForm.category = '';
   searchForm.warehouse_id = '';
-  searchForm.snapshot_date = '';
   searchForm.page_size = 10;
   handleSearch();
 };
@@ -220,7 +252,6 @@ const viewDetail = (row) => {
     ElMessage.error('无法获取商品ID，请检查列表数据');
     return;
   }
-  // 🟢 关键修改：传递 query 参数
   router.push({
     path: `/inventory/detail/${id}`,
     query: {
@@ -229,6 +260,7 @@ const viewDetail = (row) => {
   });
 };
 
+// Excel 导出逻辑
 const handleExportExcel = async () => {
   if (tableData.value.length === 0) {
     ElMessage.warning('当前暂无数据可导出');
@@ -239,12 +271,13 @@ const handleExportExcel = async () => {
     const exportData = tableData.value.map(item => ({
       '商品编码': item.goods_code,
       '商品名称': item.goods_name,
+      '分类': item.goods_type_name || '-',
       '仓库': getWarehouseName(item.warehouse_id),
       '库位': item.storage_code || '-',
       '总库存': item.total_number,
       '可用库存': item.available_total_number,
       '冻结库存': item.frozen_total_number,
-      '快照时间': item.snapshot_time || '-'
+      '更新时间': item.snapshot_time || '-'
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -260,6 +293,7 @@ const handleExportExcel = async () => {
   }
 };
 
+// PDF 导出逻辑
 const handleExportPDF = async () => {
   if (tableData.value.length === 0) {
     ElMessage.warning('当前暂无数据可导出');
@@ -279,14 +313,14 @@ const handleExportPDF = async () => {
     doc.addFont('SimHei.ttf', 'SimHei', 'normal');
     doc.setFont('SimHei');
 
-    const tableColumn = ["商品编码", "商品名称", "仓库", "总库存", "可用", "快照时间"];
+    const tableColumn = ["商品编码", "商品名称", "仓库", "总库存", "可用", "时间"];
     const tableRows = tableData.value.map(item => [
       item.goods_code,
       item.goods_name,
       getWarehouseName(item.warehouse_id),
       String(item.total_number),
       String(item.available_total_number),
-      item.snapshot_time || '-'
+      item.snapshot_time ? item.snapshot_time.substring(0, 10) : '-'
     ]);
 
     autoTable(doc, {
@@ -320,6 +354,7 @@ const arrayBufferToBase64 = (buffer) => {
 
 onMounted(() => {
   warehouseStore.fetchWarehouses();
+  loadCategories(); // ✅ 调用分类加载
   loadData();
 });
 </script>
