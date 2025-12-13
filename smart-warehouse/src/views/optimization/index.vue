@@ -100,9 +100,9 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Download } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { getOptimizationPlans, getOptimizationPlanReport } from '@/api/optimization';
-import { exportReport } from '@/api/report'; 
-import { downloadFileFromUrl } from '@/utils/exportReport'; 
 import { useWarehouseStore } from '@/stores/warehouse'; 
 
 const router = useRouter();
@@ -183,33 +183,134 @@ const goDetail = (row) => {
   router.push(`/optimization/plans/${row.plan_id}`);
 };
 
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
+// 🟢 修复后的 stripHtml
+const stripHtml = (html) => {
+   if (!html) return "";
+   let tmp = document.createElement("DIV");
+   tmp.innerHTML = html;
+   tmp.querySelectorAll('style, script').forEach(el => el.remove());
+   let text = tmp.textContent || tmp.innerText || "";
+   return text.replace(/\n\s*\n/g, '\n').trim();
+}
+
+// 🟢 新增：提取表格
+const extractTableFromHtml = (html) => {
+  if (!html) return null;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const table = doc.querySelector('table');
+  if (!table) return null;
+
+  const headers = [];
+  const body = [];
+
+  const ths = table.querySelectorAll('thead th');
+  if (ths.length > 0) {
+    headers.push(Array.from(ths).map(th => th.innerText.trim()));
+  } else {
+    const firstRow = table.querySelector('tr');
+    if (firstRow) {
+      headers.push(Array.from(firstRow.children).map(c => c.innerText.trim()));
+    }
+  }
+
+  const rows = table.querySelectorAll('tr');
+  rows.forEach((tr) => {
+    if (tr.parentNode.tagName === 'THEAD' || tr.querySelector('th')) return;
+    const tds = tr.querySelectorAll('td');
+    if (tds.length > 0) {
+      body.push(Array.from(tds).map(td => td.innerText.trim()));
+    }
+  });
+
+  return { headers, body };
+};
+
+// 🟢 纯前端导出 PDF
 const handleExport = async (row) => {
+  let reportData = {};
+  if (row.status === 'COMPLETED') {
+    try {
+      ElMessage.info('正在获取方案数据...');
+      const detailRes = await getOptimizationPlanReport(row.plan_id);
+      if (detailRes.code === 200) {
+        reportData = detailRes.data.report || detailRes.data;
+      }
+    } catch (e) {
+      console.warn('获取详细报告失败，仅导出基本信息');
+    }
+  }
+
+  const doc = new jsPDF();
   try {
-    ElMessage.info('正在获取方案报告...');
-    const detailRes = await getOptimizationPlanReport(row.plan_id);
+    ElMessage.info('正在生成 PDF...');
     
-    // 兼容后端数据结构 (report 对象或直接平铺)
-    const reportData = detailRes.data.report || detailRes.data; 
+    const response = await fetch('/fonts/SimHei.ttf');
+    if (!response.ok) throw new Error('字体加载失败');
+    const fontBuffer = await response.arrayBuffer();
+    const fontBase64 = arrayBufferToBase64(fontBuffer);
+    
+    doc.addFileToVFS('SimHei.ttf', fontBase64);
+    doc.addFont('SimHei.ttf', 'SimHei', 'normal');
+    doc.setFont('SimHei');
 
-    if (detailRes.code !== 200 || !reportData || !reportData.report_id) {
-      ElMessage.warning('该方案尚未生成分析报告，无法导出');
-      return;
+    doc.setFontSize(18);
+    doc.text(`库存优化方案: ${row.plan_code}`, 14, 20);
+
+    autoTable(doc, {
+      startY: 30,
+      styles: { font: 'SimHei', fontStyle: 'normal' },
+      head: [['属性', '内容']],
+      body: [
+        ['方案编号', row.plan_code],
+        ['所属仓库', getWarehouseName(row.warehouse_id)],
+        ['优化类型', getOptimizationTypeLabel(row.optimization_type)],
+        ['当前状态', getStatusLabel(row.status)],
+        ['创建时间', row.created_at || '-'],
+        ['报告标题', reportData.title || '无']
+      ]
+    });
+
+    if (reportData.content_html) {
+      let finalY = doc.lastAutoTable.finalY + 10;
+      doc.text("报告详情:", 14, finalY);
+
+      // 智能判断：表格还是文本
+      const tableData = extractTableFromHtml(reportData.content_html);
+
+      if (tableData && (tableData.headers.length > 0 || tableData.body.length > 0)) {
+         autoTable(doc, {
+            startY: finalY + 5,
+            head: tableData.headers,
+            body: tableData.body,
+            styles: { font: 'SimHei', fontStyle: 'normal', fontSize: 8 },
+            headStyles: { fillColor: [64, 158, 255] }
+         });
+      } else {
+         const textContent = stripHtml(reportData.content_html);
+         const splitText = doc.splitTextToSize(textContent, 180);
+         doc.setFontSize(10);
+         doc.text(splitText, 14, finalY + 10);
+      }
     }
 
-    const reportId = reportData.report_id;
-
-    ElMessage.info('正在请求下载链接...');
-    const exportRes = await exportReport(reportId, 'PDF');
-    
-    if (exportRes.code === 200 && exportRes.data.download_url) {
-      downloadFileFromUrl(exportRes.data.download_url);
-    } else {
-      ElMessage.warning('后端未返回有效的下载链接');
-    }
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    doc.save(`优化方案_${row.plan_code}_${dateStr}.pdf`);
+    ElMessage.success('PDF 导出成功');
 
   } catch (error) {
-    console.error('导出流程失败:', error);
-    ElMessage.error('导出失败，请检查网络或后端服务');
+    console.error('PDF 导出失败:', error);
+    ElMessage.error('导出失败：' + error.message);
   }
 };
 

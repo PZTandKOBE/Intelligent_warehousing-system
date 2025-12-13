@@ -6,7 +6,6 @@
           <span style="color: #fff; font-weight: bold;">库存详情 / {{ itemInfo.goods_code || '-' }}</span>
         </template>
         <template #extra>
-          <el-button type="primary" :icon="Edit">编辑资料</el-button>
           <el-button type="success" :icon="Refresh" @click="handleRefresh">刷新库存</el-button>
         </template>
       </el-page-header>

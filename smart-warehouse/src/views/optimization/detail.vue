@@ -53,9 +53,10 @@ import { useRoute } from 'vue-router';
 import { Download, Document } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useWarehouseStore } from '@/stores/warehouse';
-import { downloadFileFromUrl } from '@/utils/exportReport';
-import { getOptimizationPlanReport } from '@/api/optimization'; // 删除了 tasks 接口引用
-import { exportReport } from '@/api/report';
+// 引入前端导出库
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { getOptimizationPlanReport } from '@/api/optimization';
 
 const route = useRoute();
 const warehouseStore = useWarehouseStore();
@@ -78,9 +79,68 @@ const getStatusLabel = (status) => {
   return map[status] || status;
 };
 
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
+// 🟢 修复后的 stripHtml：彻底移除 style/script 标签
+const stripHtml = (html) => {
+   if (!html) return "";
+   let tmp = document.createElement("DIV");
+   tmp.innerHTML = html;
+   
+   // 移除干扰标签
+   tmp.querySelectorAll('style, script').forEach(el => el.remove());
+
+   let text = tmp.textContent || tmp.innerText || "";
+   return text.replace(/\n\s*\n/g, '\n').trim();
+};
+
+// 🟢 新增：提取表格数据用于 PDF 渲染
+const extractTableFromHtml = (html) => {
+  if (!html) return null;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const table = doc.querySelector('table');
+  if (!table) return null;
+
+  const headers = [];
+  const body = [];
+
+  // 提取表头
+  const ths = table.querySelectorAll('thead th');
+  if (ths.length > 0) {
+    headers.push(Array.from(ths).map(th => th.innerText.trim()));
+  } else {
+    // 如果没有 thead，尝试取第一行
+    const firstRow = table.querySelector('tr');
+    if (firstRow) {
+      headers.push(Array.from(firstRow.children).map(c => c.innerText.trim()));
+    }
+  }
+
+  // 提取内容 (排除表头行)
+  const rows = table.querySelectorAll('tr');
+  rows.forEach((tr) => {
+    if (tr.parentNode.tagName === 'THEAD' || tr.querySelector('th')) return;
+    
+    const tds = tr.querySelectorAll('td');
+    if (tds.length > 0) {
+      body.push(Array.from(tds).map(td => td.innerText.trim()));
+    }
+  });
+
+  return { headers, body };
+};
+
 // --- API Calls ---
 
-// 只加载详情和报告，不再加载任务
 const loadData = async () => {
   if (!planId) {
     ElMessage.error('参数错误：未获取到方案ID');
@@ -92,20 +152,16 @@ const loadData = async () => {
     const reportRes = await getOptimizationPlanReport(planId);
     
     if (reportRes.code === 200) {
-      // 🟢 修复点 1：直接把返回的 data 赋值给 reportData
       const rawData = reportRes.data || {};
       reportData.value = rawData; 
 
-      // 🟢 修复点 2：手动构造 planData
-      // 因为接口只返回了报告信息，我们需要从 content_json 或 report 字段里拼凑出方案信息用于头部展示
       const planInfo = rawData.content_json || {};
       
       planData.value = {
         plan_id: rawData.plan_id,
-        // 优先从 content_json 里取 plan_code，没有的话用 report_code 顶替
         plan_code: planInfo.plan_code || rawData.report_code, 
         warehouse_id: planInfo.warehouse_id,
-        status: rawData.status, // 这里的 status 是报告状态 (PUBLISHED)
+        status: rawData.status,
         created_at: rawData.created_at
       };
       
@@ -121,25 +177,82 @@ const loadData = async () => {
   }
 };
 
+// 🟢 纯前端导出 PDF (含表格解析)
 const handleExport = async () => {
-  const targetId = reportData.value.report_id;
-  
-  if (!targetId) {
-    ElMessage.warning('该方案尚未生成报告，无法导出');
+  if (!planData.value.plan_code) {
+    ElMessage.warning('数据尚未加载完成，请稍候');
     return;
   }
 
+  const doc = new jsPDF();
   try {
-    ElMessage.info('正在请求下载...');
-    const res = await exportReport(targetId, 'PDF');
-    if (res.code === 200 && res.data && res.data.download_url) {
-      downloadFileFromUrl(res.data.download_url);
-    } else {
-      ElMessage.warning('暂无下载链接');
+    ElMessage.info('正在生成 PDF...');
+    
+    const response = await fetch('/fonts/SimHei.ttf');
+    if (!response.ok) throw new Error('字体加载失败');
+    const fontBuffer = await response.arrayBuffer();
+    const fontBase64 = arrayBufferToBase64(fontBuffer);
+    
+    doc.addFileToVFS('SimHei.ttf', fontBase64);
+    doc.addFont('SimHei.ttf', 'SimHei', 'normal');
+    doc.setFont('SimHei');
+
+    // Title
+    doc.setFontSize(18);
+    doc.text(`库存优化分析报告`, 14, 20);
+
+    // Summary Table
+    autoTable(doc, {
+      startY: 30,
+      styles: { font: 'SimHei', fontStyle: 'normal' },
+      head: [['项目', '详情']],
+      body: [
+        ['方案编号', planData.value.plan_code],
+        ['仓库', getWarehouseName(planData.value.warehouse_id)],
+        ['生成时间', planData.value.created_at || '-'],
+        ['报告标题', reportData.value.title || '-'],
+        ['状态', getStatusLabel(planData.value.status)]
+      ]
+    });
+
+    // Report Content
+    if (reportData.value.content_html) {
+      let finalY = doc.lastAutoTable.finalY + 15;
+      
+      // 1. 标题
+      doc.setFontSize(14);
+      doc.text("报告正文概要:", 14, finalY);
+      
+      // 2. 尝试提取表格
+      const tableData = extractTableFromHtml(reportData.value.content_html);
+
+      if (tableData && (tableData.headers.length > 0 || tableData.body.length > 0)) {
+        // ✅ 渲染表格
+        autoTable(doc, {
+          startY: finalY + 5,
+          head: tableData.headers,
+          body: tableData.body,
+          styles: { font: 'SimHei', fontStyle: 'normal', fontSize: 9, cellPadding: 2 },
+          headStyles: { fillColor: [64, 158, 255], textColor: 255 },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 10 }
+        });
+      } else {
+        // ❌ 没表格，渲染清洗后的纯文本
+        const cleanText = stripHtml(reportData.value.content_html);
+        const splitText = doc.splitTextToSize(cleanText, 180);
+        doc.setFontSize(10);
+        doc.text(splitText, 14, finalY + 10);
+      }
     }
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    doc.save(`优化报告_${planData.value.plan_code}_${dateStr}.pdf`);
+    ElMessage.success('导出成功');
+
   } catch (error) {
     console.error(error);
-    ElMessage.error('导出请求失败');
+    ElMessage.error('导出失败: ' + error.message);
   }
 };
 
@@ -152,80 +265,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-
-.mb-20 {
-  margin-bottom: 20px;
-}
-
-.mr-5 {
-  margin-right: 5px;
-}
-
-.custom-header {
-  background: #1d1e1f;
-  padding: 15px;
-  border: 1px solid #333;
-}
-
-:deep(.el-page-header__content) {
-  color: #fff;
-}
-
-.detail-card {
-  background: #1d1e1f;
-  border: 1px solid #333;
-  color: #cfd3dc;
-}
-
-.card-header {
-  font-weight: bold;
-  color: #fff;
-}
-
-:deep(.custom-desc .el-descriptions__label) {
-  background: #262729 !important;
-  color: #909399;
-  width: 120px;
-}
-
-:deep(.custom-desc .el-descriptions__content) {
-  background: #1d1e1f !important;
-  color: #fff;
-}
-
-.report-html-content {
-  line-height: 1.8;
-  color: #cfd3dc;
-  padding: 10px;
-}
-
-:deep(strong) {
-  color: #409EFF;
-}
-
-:deep(ul) {
-  padding-left: 20px;
-}
-
-:deep(li) {
-  margin-bottom: 8px;
-}
-
-.iframe-container {
-  width: 100%;
-  height: 800px; /* 或者使用 min-height: 60vh */
-  background-color: #fff; /* iframe 内部通常是白底文件，给个背景避免加载闪烁 */
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.report-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
+.page-container { padding: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.mr-5 { margin-right: 5px; }
+.custom-header { background: #1d1e1f; padding: 15px; border: 1px solid #333; }
+:deep(.el-page-header__content) { color: #fff; }
+.detail-card { background: #1d1e1f; border: 1px solid #333; color: #cfd3dc; }
+.card-header { font-weight: bold; color: #fff; }
+:deep(.custom-desc .el-descriptions__label) { background: #262729 !important; color: #909399; width: 120px; }
+:deep(.custom-desc .el-descriptions__content) { background: #1d1e1f !important; color: #fff; }
+.iframe-container { width: 100%; height: 800px; background-color: #fff; border-radius: 4px; overflow: hidden; }
+.report-iframe { width: 100%; height: 100%; border: none; display: block; }
 </style>
