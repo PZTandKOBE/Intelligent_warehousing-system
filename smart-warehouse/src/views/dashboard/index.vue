@@ -39,12 +39,6 @@
           </template>
           <div class="kpi-body">
             <div class="number">¥ {{ formatNumber(kpiData.total_inventory_value) }}</div>
-            <div class="desc">
-              优化任务进度
-              <span class="trend up" style="margin-left:5px">
-                {{ kpiData.optimization_task_progress || 0 }}%
-              </span>
-            </div>
           </div>
         </el-card>
       </el-col>
@@ -62,10 +56,7 @@
             </div>
           </template>
           <div class="kpi-body">
-            <div class="number danger">{{ kpiData.stagnant_materials_count || 0 }}</div>
-            <div class="desc">
-              补货及时率 <span class="text-warning">{{ kpiData.replenishment_timeliness_rate || 0 }}%</span>
-            </div>
+            <div class="number danger">{{ kpiData.stagnant_materials_count || 0 }}种</div>
           </div>
         </el-card>
       </el-col>
