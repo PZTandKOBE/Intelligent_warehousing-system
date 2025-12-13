@@ -15,7 +15,7 @@
       <template #header>
         <div class="card-header">📄 报告元信息 (Meta Info)</div>
       </template>
-      <el-descriptions :column="3" border class="custom-desc">
+      <el-descriptions :column="2" border class="custom-desc">
         <el-descriptions-item label="报告标题">{{ reportData.title || '-' }}</el-descriptions-item>
         <el-descriptions-item label="报告ID">{{ reportData.report_id || '-' }}</el-descriptions-item>
         
@@ -31,11 +31,11 @@
             </el-tag>
           </el-descriptions-item>
 
-        <el-descriptions-item label="邮件通知">
+        <!-- <el-descriptions-item label="邮件通知">
           <span :class="reportData.email_sent ? 'text-success' : 'text-gray'">
             <el-icon><Message /></el-icon> {{ reportData.email_sent ? '已自动发送' : '未发送' }}
           </span>
-        </el-descriptions-item>
+        </el-descriptions-item> -->
       </el-descriptions>
     </el-card>
 
@@ -81,7 +81,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { Download, Message } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getReportDetail } from '@/api/report'; 
-// 🟢 引入导出工具
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -136,13 +135,10 @@ const reportHtml = computed(() => {
   return '';
 });
 
-// 🟢 样式处理：确保 A4 容器内样式正确，防止污染全局
 const processedHtml = computed(() => {
   const html = reportHtml.value;
   if (!html) return '';
-  // 替换 body 样式为局部类名
   let processed = html.replace(/body\s*\{/g, '.report-hidden-container {');
-  // 移除固定宽度，适应容器
   processed = processed.replace(/width:\s*[\d]+px/g, 'width: 100%');
   return processed;
 });
@@ -198,7 +194,7 @@ const loadData = async () => {
   }
 };
 
-// 🟢 核心算法：长图切割分页
+//核心算法：长图切割分页
 const addContentToPdf = (doc, canvas, startY, margin) => {
   const contentWidth = canvas.width;
   const contentHeight = canvas.height;
@@ -251,7 +247,7 @@ const addContentToPdf = (doc, canvas, startY, margin) => {
   }
 };
 
-// 🟢 纯前端导出逻辑
+//纯前端导出逻辑
 const handleExport = async () => {
   exportLoading.value = true;
   try {
@@ -362,7 +358,7 @@ onMounted(() => {
   display: block;
 }
 
-/* 🟢 隐藏容器 A4 样式 */
+/*隐藏容器 A4 样式 */
 .report-hidden-container {
   position: absolute;
   top: 0;

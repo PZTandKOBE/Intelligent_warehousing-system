@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建 axios 实例
 const service = axios.create({
   // 如果有环境变量配置，可改为 import.meta.env.VITE_BASE_API
   baseURL: '', 
@@ -37,5 +36,5 @@ service.interceptors.response.use(
   }
 )
 
-// 关键：必须默认导出
+
 export default service

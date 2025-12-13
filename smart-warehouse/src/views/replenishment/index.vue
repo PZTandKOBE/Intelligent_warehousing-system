@@ -22,7 +22,7 @@
         </el-form-item>
         <el-form-item label="紧急度">
           <el-select v-model="filters.urgency" placeholder="全部" style="width: 100px" clearable>
-            <el-option label="临界" value="CRITICAL" />
+            <el-option label="紧急" value="CRITICAL" />
             <el-option label="高" value="HIGH" />
             <el-option label="中" value="MEDIUM" />
             <el-option label="低" value="LOW" />
@@ -85,7 +85,7 @@
 
         <el-table-column prop="status" label="状态" min-width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'PENDING' ? 'warning' : 'info'" effect="plain" size="small">
+            <el-tag :type="row.status === '待处理' ? 'warning' : 'success'" effect="plain" size="small">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
@@ -213,7 +213,6 @@ import { useRouter } from 'vue-router';
 import { Search, Refresh, View, Setting } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getReplenishmentList } from '@/api/replenishment';
-// ✅ 新增引入 getInventoryList 用于获取真实商品
 import { getInventoryList } from '@/api/inventory';
 import { useWarehouseStore } from '@/stores/warehouse'; 
 
@@ -250,7 +249,6 @@ const openConfigDialog = () => {
   loadConfigList();
 };
 
-// 🟢 加载配置列表 (对接真实库存接口)
 const loadConfigList = async () => {
   configLoading.value = true;
   try {
@@ -274,7 +272,6 @@ const loadConfigList = async () => {
       goods_name: nameParam
     };
 
-    // 调用真实接口获取商品
     const res = await getInventoryList(params);
     
     if (res.code === 200) {
@@ -284,7 +281,7 @@ const loadConfigList = async () => {
         goods_code: item.goods_code,
         goods_name: item.goods_name,
         warehouse_id: item.warehouse_id,
-        enabled: true, // ⚠️ 默认全部开启 (模拟状态)
+        enabled: true,
         switching: false
       }));
       configTotal.value = res.data.total;
@@ -297,7 +294,7 @@ const loadConfigList = async () => {
   }
 };
 
-// 🟡 开关切换 (纯前端模拟，不调后端)
+//开关切换 (纯前端模拟，不调后端)
 const handleConfigChange = async (row) => {
   row.switching = true;
   try {
@@ -326,7 +323,12 @@ const getUrgencyLabel = (val) => {
 };
 
 const getUrgencyTag = (val) => {
-  const map = { 'CRITICAL': 'danger', 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info' };
+  const map = { 
+    '高': 'danger', 
+    '紧急': 'danger', 
+    '中': 'warning', 
+    '低': 'success' 
+  };
   return map[val] || 'info';
 };
 
@@ -386,40 +388,127 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.search-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) { 
-  background-color: #262729; 
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+  padding-right: 8px;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-date-editor) {
+  background-color: #262729;
   box-shadow: 0 0 0 1px #4c4d4f inset;
   color: #fff;
 }
-:deep(.el-input__inner) { color: #fff; }
-.list-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-table) {
-  background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333;
-  --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
+
+:deep(.el-input__inner) {
+  color: #fff;
 }
-:deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
+
+.list-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+:deep(.el-table) {
+  background-color: transparent !important;
+  color: #cfd3dc;
+  --el-table-border-color: #333;
+  --el-table-header-bg-color: #262729;
+  --el-table-row-hover-bg-color: #2c3e50;
+}
+
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
   background-color: transparent !important;
   border-bottom: 1px solid #333 !important;
   border-right: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
-.text-primary { color: #409EFF; }
-.text-danger { color: #F56C6C; }
-.text-success { color: #67C23A; }
-.text-gray { color: #909399; }
-.font-bold { font-weight: bold; }
-.sub-text { font-size: 12px; color: #909399; }
-.stock-compare { display: flex; align-items: center; justify-content: center; gap: 5px; } /* 居中对齐 */
-.divider { margin: 0 5px; color: #555; }
-:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
-:deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-dialog) { background-color: #1d1e1f; border: 1px solid #333; }
-:deep(.el-dialog__title) { color: #fff; }
-:deep(.el-dialog__body) { padding-top: 10px; }
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+  font-weight: bold;
+}
+
+.text-primary {
+  color: #409EFF;
+}
+
+.text-danger {
+  color: #F56C6C;
+}
+
+.text-success {
+  color: #67C23A;
+}
+
+.text-gray {
+  color: #636b7a;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.sub-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+.stock-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* 居中对齐 */
+.divider {
+  margin: 0 5px;
+  color: #555;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-pagination.is-background .el-pager li.is-active) {
+  background-color: #409EFF;
+  color: #fff;
+}
+
+:deep(.el-pagination.is-background .btn-prev),
+:deep(.el-pagination.is-background .btn-next) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-dialog) {
+  background-color: #1d1e1f;
+  border: 1px solid #333;
+}
+
+:deep(.el-dialog__title) {
+  color: #fff;
+}
+
+:deep(.el-dialog__body) {
+  padding-top: 10px;
+}
 </style>

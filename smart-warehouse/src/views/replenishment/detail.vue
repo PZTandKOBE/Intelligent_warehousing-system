@@ -69,7 +69,6 @@ import { useWarehouseStore } from '@/stores/warehouse';
 import { getReplenishmentReport } from '@/api/replenishment'; 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// 🟢 1. 引入 html2canvas 用于截图
 import html2canvas from 'html2canvas';
 
 const route = useRoute();
@@ -79,7 +78,6 @@ const recId = route.params.id;
 const loading = ref(false);
 const recData = ref({});    
 const reportData = ref({}); 
-// 🟢 2. 新增 ref 用于获取 DOM
 const reportHiddenRef = ref(null);
 
 // --- Helper Functions ---
@@ -91,14 +89,22 @@ const getWarehouseName = (id) => {
   return found ? found.warehouse_name : `WH-${id}`;
 };
 
+//颜色区分逻辑 (4级颜色)
 const getUrgencyType = (urgency) => {
-  if (urgency === 'HIGH' || urgency === 'CRITICAL') return 'danger';
-  if (urgency === 'MEDIUM') return 'warning';
-  return 'info';
+  if (urgency === 'CRITICAL') return 'danger';  
+  if (urgency === 'HIGH') return 'warning';     
+  if (urgency === 'MEDIUM') return 'primary';   
+  if (urgency === 'LOW') return 'success';      
+  return 'info';                                
 };
 
 const getUrgencyLabel = (urgency) => {
-  const map = { 'CRITICAL': '临界', 'HIGH': '紧急', 'MEDIUM': '一般', 'LOW': '低' };
+  const map = { 
+    'CRITICAL': '临界 (Critical)', 
+    'HIGH': '紧急 (High)', 
+    'MEDIUM': '一般 (Medium)', 
+    'LOW': '低 (Low)' 
+  };
   return map[urgency] || urgency || '-';
 };
 
@@ -112,14 +118,10 @@ const arrayBufferToBase64 = (buffer) => {
   return window.btoa(binary);
 };
 
-// 🟢 3. 处理 HTML：替换 body 样式，防止污染全局，并确保截图样式正确
 const processedHtml = computed(() => {
   const html = reportData.value.content_html;
   if (!html) return '';
-  // 将 body 选择器替换为我们的容器类名，防止全局污染
-  // 同时确保背景色为白，字体为黑
   let processed = html.replace(/body\s*\{/g, '.report-hidden-container {');
-  // 移除可能存在的固定宽度限制，改用 100% 以适应截图容器
   processed = processed.replace(/width:\s*[\d]+px/g, 'width: 100%');
   return processed;
 });
@@ -163,13 +165,11 @@ const loadData = async () => {
   }
 };
 
-// 🟢 4. 混合导出：头部用表格，详情用 HTML 截图
 const handleExport = async () => {
   const doc = new jsPDF();
   try {
     ElMessage.info('正在生成 PDF...');
     
-    // 加载字体
     const response = await fetch('/fonts/SimHei.ttf');
     if (!response.ok) throw new Error('字体加载失败');
     const fontBuffer = await response.arrayBuffer();
@@ -179,11 +179,9 @@ const handleExport = async () => {
     doc.addFont('SimHei.ttf', 'SimHei', 'normal');
     doc.setFont('SimHei');
 
-    // 绘制标题
     doc.setFontSize(18);
     doc.text(`补货建议报告`, 14, 20);
 
-    // 绘制基本信息表格 (保持矢量清晰度)
     autoTable(doc, {
       startY: 30,
       styles: { font: 'SimHei', fontStyle: 'normal' },
@@ -199,38 +197,32 @@ const handleExport = async () => {
       ]
     });
 
-    // 处理 HTML 详情 (截图方案)
     if (processedHtml.value && reportHiddenRef.value) {
       let finalY = doc.lastAutoTable.finalY + 15;
       doc.setFontSize(14);
       doc.text("详细说明:", 14, finalY);
       finalY += 5;
 
-      // 等待 DOM 更新
       await nextTick();
 
-      // 生成截图
       const canvas = await html2canvas(reportHiddenRef.value, {
-        scale: 2, // 提高清晰度 (2倍图)
-        useCORS: true, // 允许跨域图片
-        backgroundColor: '#ffffff' // 强制白底，防止透明
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff' 
       });
 
       const imgData = canvas.toDataURL('image/png');
       const imgProps = doc.getImageProperties(imgData);
       
-      // 计算图片在 PDF 中的尺寸
       const pdfPageWidth = doc.internal.pageSize.getWidth();
       const pdfPageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
       const contentWidth = pdfPageWidth - (margin * 2);
-      // 按比例缩放高度
       const contentHeight = (imgProps.height * contentWidth) / imgProps.width;
 
-      // 检查是否需要分页
       if (finalY + contentHeight > pdfPageHeight) {
         doc.addPage();
-        finalY = 20; // 新页面的起始高度
+        finalY = 20; 
       }
 
       doc.addImage(imgData, 'PNG', margin, finalY, contentWidth, contentHeight);
@@ -255,33 +247,85 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.mr-5 { margin-right: 5px; }
-.font-bold { font-weight: bold; }
-.text-primary { color: #409EFF; }
-.custom-header { background: #1d1e1f; padding: 15px; border: 1px solid #333; }
-:deep(.el-page-header__content) { color: #fff; }
-.detail-card { background: #1d1e1f; border: 1px solid #333; color: #cfd3dc; }
-.card-header { font-weight: bold; color: #fff; }
-:deep(.custom-desc .el-descriptions__label) { background: #262729 !important; color: #909399; width: 120px; }
-:deep(.custom-desc .el-descriptions__content) { background: #1d1e1f !important; color: #fff; }
-.iframe-container { width: 100%; height: 800px; background-color: #fff; border-radius: 4px; overflow: hidden; }
-.report-iframe { width: 100%; height: 100%; border: none; display: block; }
+.page-container {
+  padding: 20px;
+}
 
-/* 🟢 5. 隐藏的截图容器样式 */
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.mr-5 {
+  margin-right: 5px;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.text-primary {
+  color: #409EFF;
+}
+
+.custom-header {
+  background: #1d1e1f;
+  padding: 15px;
+  border: 1px solid #333;
+}
+
+:deep(.el-page-header__content) {
+  color: #fff;
+}
+
+.detail-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #cfd3dc;
+}
+
+.card-header {
+  font-weight: bold;
+  color: #fff;
+}
+
+:deep(.custom-desc .el-descriptions__label) {
+  background: #262729 !important;
+  color: #909399;
+  width: 120px;
+}
+
+:deep(.custom-desc .el-descriptions__content) {
+  background: #1d1e1f !important;
+  color: #fff;
+}
+
+.iframe-container {
+  width: 100%;
+  height: 800px;
+  background-color: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.report-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
 .report-hidden-container {
   position: absolute;
   top: 0;
-  left: -9999px; /* 移出可视区域 */
-  width: 750px; /* 模拟 A4 纸宽度，确保布局正常 */
+  left: -9999px;
+  width: 750px;
   background-color: #fff;
   color: #000;
   padding: 30px;
-  font-family: "SimHei", sans-serif; /* 确保字体一致 */
+  font-family: "SimHei", sans-serif;
   z-index: -1;
 }
-/* 强制容器内的元素使用黑色字体，防止暗黑模式变量影响 */
+
 .report-hidden-container :deep(*) {
   color: #000 !important;
   background-color: transparent;

@@ -79,7 +79,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="goods_type_name" label="分类" width="120" show-overflow-tooltip />
+        <el-table-column prop="goods_type_name" label="分类" width="180" show-overflow-tooltip />
 
         <el-table-column label="位置信息" width="180">
           <template #default="{ row }">
@@ -143,7 +143,6 @@ import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx'; 
 import jsPDF from 'jspdf';     
 import autoTable from 'jspdf-autotable'; 
-// 引入新增的 getGoodsCategories
 import { getInventoryList, getGoodsCategories } from '@/api/inventory';
 import { useWarehouseStore } from '@/stores/warehouse';
 
@@ -153,7 +152,7 @@ const warehouseStore = useWarehouseStore();
 const loading = ref(false);
 const total = ref(0);
 const tableData = ref([]);
-const categoryOptions = ref([]); // 存储真实的分类数据
+const categoryOptions = ref([]); 
 
 const searchForm = reactive({
   keyword: '',
@@ -173,7 +172,6 @@ const loadCategories = async () => {
   try {
     const res = await getGoodsCategories();
     if (res.code === 200) {
-      // 假设后端返回结构 { data: { items: [...] } }
       categoryOptions.value = res.data.items || [];
     }
   } catch (error) {
@@ -185,11 +183,9 @@ const loadCategories = async () => {
 const loadData = async () => {
   loading.value = true;
   try {
-    // 处理关键词逻辑：如果没填，就是 undefined
     let codeParam = undefined;
     let nameParam = undefined;
     
-    // 简单的智能判断：如果关键词存在
     if (searchForm.keyword) {
       // 如果看起来像编码（例如纯数字或包含特定前缀），传给 code
       // 这里简单假设：如果是纯数字或者以 'MAT-' 开头，可能是编码
@@ -205,7 +201,7 @@ const loadData = async () => {
       page: searchForm.page,
       page_size: searchForm.page_size,
       warehouse_id: searchForm.warehouse_id || undefined,
-      goods_type: searchForm.category || undefined, // 传递选中的分类值
+      goods_type: searchForm.category || undefined, 
       goods_code: codeParam, // 对应后端 goods_code
       goods_name: nameParam  // 对应后端 goods_name
     };
@@ -354,45 +350,158 @@ const arrayBufferToBase64 = (buffer) => {
 
 onMounted(() => {
   warehouseStore.fetchWarehouses();
-  loadCategories(); // ✅ 调用分类加载
+  loadCategories(); // 调用分类加载
   loadData();
 });
 </script>
 
 <style scoped>
-/* 样式保留 */
-.page-container { padding: 20px; box-sizing: border-box; }
-.mb-20 { margin-bottom: 20px; }
-.ml-10 { margin-left: 10px; }
-.search-card { background: #1d1e1f; border: 1px solid #333; display: flex; align-items: center; padding: 18px 20px 0 20px; }
-.search-form { display: flex; flex-wrap: wrap; align-items: center; width: 100%; gap: 10px; }
-:deep(.el-form-item) { margin-bottom: 18px; margin-right: 0; }
-:deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) { 
-  background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff;
+.page-container {
+  padding: 20px;
+  box-sizing: border-box;
 }
-:deep(.el-input__inner) { color: #fff; }
-.table-card { background: #1d1e1f; border: 1px solid #333; }
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  display: flex;
+  align-items: center;
+  padding: 18px 20px 0 20px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+  margin-right: 0;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+  padding-right: 8px;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-date-editor) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
+  color: #fff;
+}
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+.table-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
 :deep(.el-table) {
-  --el-table-border-color: #333; --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
-  background-color: transparent !important; color: #cfd3dc;
+  --el-table-border-color: #333;
+  --el-table-header-bg-color: #262729;
+  --el-table-row-hover-bg-color: #2c3e50;
+  background-color: transparent !important;
+  color: #cfd3dc;
 }
-:deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; border-bottom: 1px solid #333 !important; border-right: 1px solid #333 !important;
+
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  border-bottom: 1px solid #333 !important;
+  border-right: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
-.text-success { color: #67C23A; }
-.text-warning { color: #E6A23C; }
-.text-gray { color: #5c5c5c; }
-.sub-text { font-size: 12px; color: #909399; margin-top: 2px; }
-.link-text { color: #409EFF; cursor: pointer; text-decoration: underline; }
-.link-text:hover { color: #79bbff; }
-.link-text-sub { cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.link-text-sub:hover { color: #409EFF; }
-.pagination-container { display: flex; justify-content: flex-end; margin-top: 20px; }
-:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
-:deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-pagination__sizes .el-select .el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
-:deep(.el-pagination__editor.el-input .el-input__wrapper) { background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; }
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+  font-weight: bold;
+}
+
+.text-success {
+  color: #67C23A;
+}
+
+.text-warning {
+  color: #E6A23C;
+}
+
+.text-gray {
+  color: #5c5c5c;
+}
+
+.sub-text {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.link-text {
+  color: #409EFF;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-text:hover {
+  color: #79bbff;
+}
+
+.link-text-sub {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-text-sub:hover {
+  color: #409EFF;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-pagination.is-background .el-pager li.is-active) {
+  background-color: #409EFF;
+  color: #fff;
+}
+
+:deep(.el-pagination.is-background .btn-prev),
+:deep(.el-pagination.is-background .btn-next) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-pagination__sizes .el-select .el-input .el-input__wrapper) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
+}
+
+:deep(.el-pagination__editor.el-input .el-input__wrapper) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
+}
 </style>

@@ -97,7 +97,7 @@ const loading = ref(false);
 const searchForm = reactive({
   code: '',
   name: '',
-  warehouse_id: '' // 保持与后端参数一致
+  warehouse_id: ''
 });
 
 // 模拟数据 (后续可替换为 api/inventory.js 中的 getInventoryList)
@@ -110,7 +110,6 @@ const inventoryList = reactive([
 ]);
 
 onMounted(() => {
-  // ✅ 挂载时获取仓库列表
   warehouseStore.fetchWarehouses();
 });
 
@@ -150,27 +149,66 @@ const handleHistory = (row) => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.mt-20 { margin-top: 20px; }
-.mt-5 { margin-top: 5px; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mt-5 {
+  margin-top: 5px;
+}
 
 /* 搜索卡片暗黑风 */
-.search-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-form-item__label) { color: #cfd3dc; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper) { 
-  background-color: #262729; 
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper) {
+  background-color: #262729;
   box-shadow: 0 0 0 1px #4c4d4f inset;
 }
-:deep(.el-input__inner) { color: #fff; }
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
 
 /* 表格卡片暗黑风 */
-.table-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-table), :deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
-  background-color: transparent !important; color: #cfd3dc; border-bottom: 1px solid #333 !important;
+.table-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold;}
-:deep(.el-table__inner-wrapper::before) { display: none !important; }
+
+:deep(.el-table),
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
+  background-color: transparent !important;
+  color: #cfd3dc;
+  border-bottom: 1px solid #333 !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+  font-weight: bold;
+}
+
+:deep(.el-table__inner-wrapper::before) {
+  display: none !important;
+}
 
 /* 悬停行高亮 */
 :deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
@@ -178,13 +216,43 @@ const handleHistory = (row) => {
 }
 
 /* 库存信息文字 */
-.stock-info { font-size: 13px; color: #909399; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;}
-.highlight-num { color: #409EFF; font-weight: bold; }
-.sub-text { color: #67C23A; }
+.stock-info {
+  font-size: 13px;
+  color: #909399;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.highlight-num {
+  color: #409EFF;
+  font-weight: bold;
+}
+
+.sub-text {
+  color: #67C23A;
+}
 
 /* 分页暗黑化 */
-.pagination-container { display: flex; justify-content: flex-end; }
-:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
-:deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-pagination.is-background .el-pager li.is-active) {
+  background-color: #409EFF;
+  color: #fff;
+}
+
+:deep(.el-pagination.is-background .btn-prev),
+:deep(.el-pagination.is-background .btn-next) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
 </style>

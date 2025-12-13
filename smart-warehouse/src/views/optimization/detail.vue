@@ -16,7 +16,7 @@
       <el-descriptions :column="3" border class="custom-desc">
         <el-descriptions-item label="方案编号">{{ planData.plan_code || '-' }}</el-descriptions-item>
         <el-descriptions-item label="报告标题">{{ reportData.title || '未生成标题' }}</el-descriptions-item>
-        <el-descriptions-item label="所属仓库">{{ getWarehouseName(planData.warehouse_id) }}</el-descriptions-item>
+        <!-- <el-descriptions-item label="所属仓库">{{ getWarehouseName(planData.warehouse_id) }}</el-descriptions-item> -->
         
         <el-descriptions-item label="创建人">System AI</el-descriptions-item>
         <el-descriptions-item label="生成时间">{{ planData.created_at || '-' }}</el-descriptions-item>
@@ -53,7 +53,6 @@ import { useRoute } from 'vue-router';
 import { Download, Document } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useWarehouseStore } from '@/stores/warehouse';
-// 引入前端导出库
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getOptimizationPlanReport } from '@/api/optimization';
@@ -89,7 +88,6 @@ const arrayBufferToBase64 = (buffer) => {
   return window.btoa(binary);
 };
 
-// 🟢 修复后的 stripHtml：彻底移除 style/script 标签
 const stripHtml = (html) => {
    if (!html) return "";
    let tmp = document.createElement("DIV");
@@ -102,7 +100,7 @@ const stripHtml = (html) => {
    return text.replace(/\n\s*\n/g, '\n').trim();
 };
 
-// 🟢 新增：提取表格数据用于 PDF 渲染
+//提取表格数据用于 PDF 渲染
 const extractTableFromHtml = (html) => {
   if (!html) return null;
   const parser = new DOMParser();
@@ -139,7 +137,6 @@ const extractTableFromHtml = (html) => {
   return { headers, body };
 };
 
-// --- API Calls ---
 
 const loadData = async () => {
   if (!planId) {
@@ -177,7 +174,6 @@ const loadData = async () => {
   }
 };
 
-// 🟢 纯前端导出 PDF (含表格解析)
 const handleExport = async () => {
   if (!planData.value.plan_code) {
     ElMessage.warning('数据尚未加载完成，请稍候');
@@ -227,7 +223,6 @@ const handleExport = async () => {
       const tableData = extractTableFromHtml(reportData.value.content_html);
 
       if (tableData && (tableData.headers.length > 0 || tableData.body.length > 0)) {
-        // ✅ 渲染表格
         autoTable(doc, {
           startY: finalY + 5,
           head: tableData.headers,
@@ -238,7 +233,6 @@ const handleExport = async () => {
           margin: { top: 10 }
         });
       } else {
-        // ❌ 没表格，渲染清洗后的纯文本
         const cleanText = stripHtml(reportData.value.content_html);
         const splitText = doc.splitTextToSize(cleanText, 180);
         doc.setFontSize(10);
@@ -265,15 +259,62 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.mr-5 { margin-right: 5px; }
-.custom-header { background: #1d1e1f; padding: 15px; border: 1px solid #333; }
-:deep(.el-page-header__content) { color: #fff; }
-.detail-card { background: #1d1e1f; border: 1px solid #333; color: #cfd3dc; }
-.card-header { font-weight: bold; color: #fff; }
-:deep(.custom-desc .el-descriptions__label) { background: #262729 !important; color: #909399; width: 120px; }
-:deep(.custom-desc .el-descriptions__content) { background: #1d1e1f !important; color: #fff; }
-.iframe-container { width: 100%; height: 800px; background-color: #fff; border-radius: 4px; overflow: hidden; }
-.report-iframe { width: 100%; height: 100%; border: none; display: block; }
+.page-container {
+  padding: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.mr-5 {
+  margin-right: 5px;
+}
+
+.custom-header {
+  background: #1d1e1f;
+  padding: 15px;
+  border: 1px solid #333;
+}
+
+:deep(.el-page-header__content) {
+  color: #fff;
+}
+
+.detail-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  color: #cfd3dc;
+}
+
+.card-header {
+  font-weight: bold;
+  color: #fff;
+}
+
+:deep(.custom-desc .el-descriptions__label) {
+  background: #262729 !important;
+  color: #909399;
+  width: 120px;
+}
+
+:deep(.custom-desc .el-descriptions__content) {
+  background: #1d1e1f !important;
+  color: #fff;
+}
+
+.iframe-container {
+  width: 100%;
+  height: 800px;
+  background-color: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.report-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
 </style>

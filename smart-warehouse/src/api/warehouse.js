@@ -1,10 +1,8 @@
 import request from '@/utils/request'
 
-// ⚡️ 改为 false，正式对接后端
 const USE_MOCK = false; 
 
-/**
- * ✅ [新增] 获取仓库列表
+/**获取仓库列表
  * 对应文档: GET /api/v1/common/warehouses
  */
 export function getWarehouses() {
@@ -19,7 +17,6 @@ export function getWarehouses() {
  * @param {string|number} warehouseId - 仓库ID
  */
 export async function getDashboardHeatmap(warehouseId) {
-  // 真实请求
   return request({
     url: '/api/v1/dashboard/heatmap',
     method: 'get',

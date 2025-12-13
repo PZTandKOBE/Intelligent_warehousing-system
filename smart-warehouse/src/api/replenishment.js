@@ -33,7 +33,6 @@ export function getReplenishmentPlans(params) {
   })
 }
 
-// ================= 新增配置接口 (待后端实现) =================
 
 /**
  * 获取补货预测配置列表 (商品维度的配置)

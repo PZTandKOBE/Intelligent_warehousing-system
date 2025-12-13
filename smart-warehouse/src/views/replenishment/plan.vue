@@ -104,9 +104,9 @@ import { Search, Refresh } from '@element-plus/icons-vue';
 import { getReplenishmentPlans } from '@/api/replenishment';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { useWarehouseStore } from '@/stores/warehouse';
 
-const warehouseStore = useWarehouseStore(); // ✅ 初始化 Store
+const warehouseStore = useWarehouseStore();
 
 const calendarDate = ref(new Date());
 const drawerVisible = ref(false);
@@ -120,7 +120,6 @@ const filters = reactive({
   dateRange: []
 });
 
-// ✅ 修改：从 Store 获取名称
 const getWarehouseName = (id) => {
   const found = warehouseStore.warehouseList.find(w => w.warehouse_id === id);
   return found ? found.warehouse_name : `WH-${id}`;
@@ -201,10 +200,8 @@ watch(calendarDate, () => {
 });
 
 onMounted(async () => {
-  // ✅ 1. 先获取仓库列表
   await warehouseStore.fetchWarehouses();
   
-  // ✅ 2. 默认选中第一个仓库并加载计划
   if (warehouseStore.warehouseList.length > 0) {
     filters.warehouse_id = warehouseStore.warehouseList[0].warehouse_id;
     loadPlans();
@@ -213,57 +210,214 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
-.page-container { 
-  height: 100%; box-sizing: border-box; padding: 20px; 
-  display: flex; flex-direction: column; overflow: hidden; 
+.page-container {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.mb-20 { margin-bottom: 20px; }
-.search-card { background: #1d1e1f; border: 1px solid #333; flex-shrink: 0; }
-.search-card :deep(.el-card__body) { height: 80px; display: flex; align-items: center; padding: 0 20px; }
-.search-form :deep(.el-form-item) { margin-bottom: 0 !important; margin-right: 20px; }
-.calendar-card { flex: 1; background: #1d1e1f; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; }
-:deep(.el-card__body) { flex: 1; padding: 0; overflow-y: auto; }
-:deep(.el-calendar) { background-color: transparent; --el-calendar-border: 1px solid #333; --el-calendar-selected-bg-color: #2c3e50; }
-:deep(.el-calendar__header) { border-bottom: 1px solid #333; padding: 12px 20px; }
-:deep(.el-calendar__title) { color: #fff; font-weight: bold; }
-:deep(.el-calendar__button-group .el-button) { background-color: #262729; border-color: #4c4d4f; color: #cfd3dc; }
-:deep(.el-calendar__button-group .el-button:hover) { color: #409EFF; border-color: #409EFF; }
-:deep(.el-calendar__body) { padding: 0; }
-:deep(.el-calendar-table thead th) { color: #909399; }
-:deep(.el-calendar-table td.el-calendar-day) { height: 120px; padding: 5px; box-sizing: border-box; border-bottom: 1px solid #333; border-right: 1px solid #333; transition: background 0.3s; }
-:deep(.el-calendar-table td:hover) { background-color: #262729; cursor: pointer; }
-:deep(.el-calendar-table td.is-selected) { background-color: #2c3e50; }
-.calendar-cell { height: 100%; display: flex; flex-direction: column; }
-.day-num { font-size: 14px; color: #909399; margin-bottom: 4px; text-align: right; margin-right: 5px; }
-.plan-events { flex: 1; overflow-y: auto; }
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.search-card :deep(.el-card__body) {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 0 !important;
+  margin-right: 20px;
+}
+
+.calendar-card {
+  flex: 1;
+  background: #1d1e1f;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:deep(.el-card__body) {
+  flex: 1;
+  padding: 0;
+  overflow-y: auto;
+}
+
+:deep(.el-calendar) {
+  background-color: transparent;
+  --el-calendar-border: 1px solid #333;
+  --el-calendar-selected-bg-color: #2c3e50;
+}
+
+:deep(.el-calendar__header) {
+  border-bottom: 1px solid #333;
+  padding: 12px 20px;
+}
+
+:deep(.el-calendar__title) {
+  color: #fff;
+  font-weight: bold;
+}
+
+:deep(.el-calendar__button-group .el-button) {
+  background-color: #262729;
+  border-color: #4c4d4f;
+  color: #cfd3dc;
+}
+
+:deep(.el-calendar__button-group .el-button:hover) {
+  color: #409EFF;
+  border-color: #409EFF;
+}
+
+:deep(.el-calendar__body) {
+  padding: 0;
+}
+
+:deep(.el-calendar-table thead th) {
+  color: #909399;
+}
+
+:deep(.el-calendar-table td.el-calendar-day) {
+  height: 120px;
+  padding: 5px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #333;
+  border-right: 1px solid #333;
+  transition: background 0.3s;
+}
+
+:deep(.el-calendar-table td:hover) {
+  background-color: #262729;
+  cursor: pointer;
+}
+
+:deep(.el-calendar-table td.is-selected) {
+  background-color: #2c3e50;
+}
+
+.calendar-cell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.day-num {
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 4px;
+  text-align: right;
+  margin-right: 5px;
+}
+
+.plan-events {
+  flex: 1;
+  overflow-y: auto;
+}
+
 .plan-tag {
-  font-size: 12px; margin-bottom: 3px; padding: 2px 4px; border-radius: 4px;
-  display: flex; align-items: center; background-color: #333; color: #ccc;
+  font-size: 12px;
+  margin-bottom: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  background-color: #333;
+  color: #ccc;
   border-left: 3px solid #909399;
 }
-.plan-tag.normal { background-color: rgba(64, 158, 255, 0.2); color: #a0cfff; border-left-color: #409EFF; }
-.text-success { color: #67C23A; }
-.font-bold { font-weight: bold; }
-:deep(.el-form-item__label) { color: #cfd3dc; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) { 
-  background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff; 
+
+.plan-tag.normal {
+  background-color: rgba(64, 158, 255, 0.2);
+  color: #a0cfff;
+  border-left-color: #409EFF;
 }
-:deep(.el-input__inner) { color: #fff; }
-:deep(.el-range-input) { color: #fff; background: transparent; }
-:deep(.el-range-separator) { color: #909399; }
-:deep(.plan-drawer) { background-color: #1d1e1f !important; border-left: 1px solid #333; }
-:deep(.plan-drawer .el-drawer__header) { margin-bottom: 0; border-bottom: 1px solid #333; color: #fff; }
-:deep(.plan-drawer .el-drawer__title) { color: #fff; font-weight: bold; }
-.drawer-content { padding: 20px; }
+
+.text-success {
+  color: #67C23A;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-date-editor) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
+  color: #fff;
+}
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+:deep(.el-range-input) {
+  color: #fff;
+  background: transparent;
+}
+
+:deep(.el-range-separator) {
+  color: #909399;
+}
+
+:deep(.plan-drawer) {
+  background-color: #1d1e1f !important;
+  border-left: 1px solid #333;
+}
+
+:deep(.plan-drawer .el-drawer__header) {
+  margin-bottom: 0;
+  border-bottom: 1px solid #333;
+  color: #fff;
+}
+
+:deep(.plan-drawer .el-drawer__title) {
+  color: #fff;
+  font-weight: bold;
+}
+
+.drawer-content {
+  padding: 20px;
+}
+
 :deep(.el-table) {
-  background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333;
-  --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
+  background-color: transparent !important;
+  color: #cfd3dc;
+  --el-table-border-color: #333;
+  --el-table-header-bg-color: #262729;
+  --el-table-row-hover-bg-color: #2c3e50;
 }
-:deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
+
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
   background-color: transparent !important;
   border-bottom: 1px solid #333 !important;
   border-right: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+  font-weight: bold;
+}
 </style>

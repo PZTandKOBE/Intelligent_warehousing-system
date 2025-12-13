@@ -25,11 +25,10 @@
             <el-tag effect="dark" type="info" class="ml-10">ID: {{ itemInfo.goods_id }}</el-tag>
           </div>
           
-          <el-descriptions :column="4" class="custom-desc" border>
+          <el-descriptions :column="3" class="custom-desc" border>
             <el-descriptions-item label="规格型号">{{ itemInfo.spec || '-' }}</el-descriptions-item>
             <el-descriptions-item label="计量单位">{{ itemInfo.unit || 'pcs' }}</el-descriptions-item>
             <el-descriptions-item label="单价">¥ {{ itemInfo.price || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="供应商">{{ itemInfo.supplier || '-' }}</el-descriptions-item>
             
             <el-descriptions-item label="仓库">{{ getWarehouseName(itemInfo.warehouse_id) }}</el-descriptions-item>
             <el-descriptions-item label="库位">{{ itemInfo.storage_code || '暂无' }}</el-descriptions-item>
@@ -56,12 +55,6 @@
         <el-card shadow="hover" class="kpi-card">
           <div class="label">冻结库存</div>
           <div class="value warning">{{ stockInfo.frozen_total_number }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="kpi-card">
-          <div class="label">本月周转率</div>
-          <div class="value info">-</div>
         </el-card>
       </el-col>
     </el-row>
@@ -131,14 +124,14 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, Edit, Refresh, Box } from '@element-plus/icons-vue';
 import { getInventoryDetail, getInventoryTransactions, getInventoryHistory } from '@/api/inventory';
-import { useWarehouseStore } from '@/stores/warehouse'; // 🟢 1. 引入 Store
+import { useWarehouseStore } from '@/stores/warehouse';
 import { ElMessage } from 'element-plus';
 import BaseChart from '@/components/BaseChart.vue'; 
 import dayjs from 'dayjs';
 
 const router = useRouter();
 const route = useRoute();
-const warehouseStore = useWarehouseStore(); // 🟢 2. 初始化 Store
+const warehouseStore = useWarehouseStore(); 
 const activeTab = ref('location');
 const loading = ref(false);
 const trendPeriod = ref('7d');
@@ -187,7 +180,7 @@ const chartOptions = reactive({
   }]
 });
 
-// 🟢 3. 修改：使用 Store 查找仓库名，替代硬编码 map
+//使用 Store 查找仓库名，替代硬编码 map
 const getWarehouseName = (id) => {
   if (!id) return '-';
   const targetId = Number(id); // 确保类型一致
@@ -210,7 +203,7 @@ const loadData = async () => {
     if (detailRes.code === 200) {
       itemInfo.value = detailRes.data;
       
-      // 🟢 4. 核心逻辑：优先使用路由传过来的 warehouse_id (父传子)
+      // 4.优先使用路由传过来的 warehouse_id (父传子)
       // 如果后端没返回，或者我们想强制用列表页传过来的 ID
       if (route.query.warehouse_id) {
         itemInfo.value.warehouse_id = Number(route.query.warehouse_id);
@@ -263,14 +256,8 @@ const loadHistory = async () => {
       end_date: end
     });
 
-    // 🟢 调试：你可以取消注释下面这行，在控制台看看真实数据
-    // console.log('历史趋势数据:', res);
 
     if (res.code === 200 && res.data) {
-      // 🟢 修复点 1：兼容两种结构
-      // 优先取 res.data.snapshots.items (你刚才发的结构)
-      // 如果没有，再尝试 res.data.items (旧结构)
-      // 如果都没有，给个空数组
       let items = [];
       if (res.data.snapshots && res.data.snapshots.items) {
         items = res.data.snapshots.items;
@@ -285,7 +272,7 @@ const loadHistory = async () => {
         return;
       }
 
-      // 🟢 修复点 2：简单的日期格式化，让 X 轴好看点
+
       const dates = items.map(i => dayjs(i.snapshot_time).format('MM-DD HH:mm'));
       const values = items.map(i => i.total_number);
       
@@ -301,8 +288,7 @@ const handleRefresh = () => {
 };
 
 const handleTabChange = (name) => {
-  // 切换 tab 时，如果切到了趋势图，才去加载数据
-  // v-if 会在这里生效，DOM 创建后 ECharts 会自动初始化
+
   if (name === 'trend') {
     loadHistory();
   }
@@ -313,7 +299,7 @@ const goBack = () => {
 };
 
 onMounted(() => {
-  // 🟢 5. 确保 Store 有数据，否则仓库名显示 ID
+  //确保 Store 有数据，否则仓库名显示 ID
   if (warehouseStore.warehouseList.length === 0) {
     warehouseStore.fetchWarehouses();
   }

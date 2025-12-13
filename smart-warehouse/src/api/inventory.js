@@ -66,7 +66,7 @@ export function getInventoryAlertDetail(alertId) {
 }
 
 /**
- * [新增] 获取库存历史趋势
+ *获取库存历史趋势
  * @param {string|number} goodsId 商品ID
  * @param {Object} params { start_date, end_date, warehouse_id }
  */

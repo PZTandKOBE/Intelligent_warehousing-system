@@ -297,7 +297,6 @@ const handleExport = async (row) => {
     const detailRes = await getReportDetail(row.report_id);
     let htmlContent = '';
     
-    // 🟢 关键修复：定义 reportInfo，优先使用详情接口返回的数据
     // 如果详情接口有数据，就用详情的，否则降级使用列表的 row
     let reportInfo = { ...row }; 
     
@@ -331,7 +330,6 @@ const handleExport = async (row) => {
     doc.setFontSize(18);
     doc.text(`系统管理报告`, 14, 20);
 
-    // 🟢 使用 reportInfo (详情数据) 而不是 row (列表数据)
     autoTable(doc, {
       startY: 30,
       styles: { font: 'SimHei', fontStyle: 'normal' },
@@ -381,38 +379,94 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
-.page-container { padding: 20px; }
-.mb-20 { margin-bottom: 20px; }
-.search-card { background: #1d1e1f; border: 1px solid #333; }
-:deep(.el-form-item__label) { color: #cfd3dc; padding-right: 8px; }
-:deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-date-editor) {
-  background-color: #262729; box-shadow: 0 0 0 1px #4c4d4f inset; color: #fff;
+.page-container {
+  padding: 20px;
 }
-:deep(.el-input__inner) { color: #fff; }
-:deep(.el-range-input) { color: #fff; background: transparent; }
-:deep(.el-range-separator) { color: #909399; }
-.list-card { background: #1d1e1f; border: 1px solid #333; }
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.search-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
+:deep(.el-form-item__label) {
+  color: #cfd3dc;
+  padding-right: 8px;
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-select__wrapper),
+:deep(.el-date-editor) {
+  background-color: #262729;
+  box-shadow: 0 0 0 1px #4c4d4f inset;
+  color: #fff;
+}
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+:deep(.el-range-input) {
+  color: #fff;
+  background: transparent;
+}
+
+:deep(.el-range-separator) {
+  color: #909399;
+}
+
+.list-card {
+  background: #1d1e1f;
+  border: 1px solid #333;
+}
+
 :deep(.el-table) {
-  background-color: transparent !important; color: #cfd3dc; --el-table-border-color: #333;
-  --el-table-header-bg-color: #262729; --el-table-row-hover-bg-color: #2c3e50;
+  background-color: transparent !important;
+  color: #cfd3dc;
+  --el-table-border-color: #333;
+  --el-table-header-bg-color: #262729;
+  --el-table-row-hover-bg-color: #2c3e50;
 }
-:deep(.el-table tr), :deep(.el-table th.el-table__cell), :deep(.el-table td.el-table__cell) {
+
+:deep(.el-table tr),
+:deep(.el-table th.el-table__cell),
+:deep(.el-table td.el-table__cell) {
   background-color: transparent !important;
   border-bottom: 1px solid #333 !important;
   border-right: 1px solid #333 !important;
 }
-:deep(.el-table th.el-table__cell) { background-color: #262729 !important; color: #fff; font-weight: bold; }
-:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) { background-color: #262729; color: #cfd3dc; }
-:deep(.el-pagination.is-background .el-pager li.is-active) { background-color: #409EFF; color: #fff; }
-:deep(.el-pagination.is-background .btn-prev), :deep(.el-pagination.is-background .btn-next) { background-color: #262729; color: #cfd3dc; }
 
-/* 🟢 隐藏容器 A4 样式 */
+:deep(.el-table th.el-table__cell) {
+  background-color: #262729 !important;
+  color: #fff;
+  font-weight: bold;
+}
+
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled)) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
+:deep(.el-pagination.is-background .el-pager li.is-active) {
+  background-color: #409EFF;
+  color: #fff;
+}
+
+:deep(.el-pagination.is-background .btn-prev),
+:deep(.el-pagination.is-background .btn-next) {
+  background-color: #262729;
+  color: #cfd3dc;
+}
+
 .report-hidden-container {
   position: absolute;
   top: 0;
   left: -9999px;
-  width: 794px; /* A4 width */
+  width: 794px;
+  /* A4 width */
   background-color: #fff;
   color: #333;
   padding: 40px;
@@ -422,22 +476,26 @@ onMounted(() => {
   z-index: -1;
   box-sizing: border-box;
 }
+
 .report-hidden-container :deep(*) {
   color: #333 !important;
   background-color: transparent !important;
   max-width: 100% !important;
 }
+
 .report-hidden-container :deep(table) {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 20px;
 }
+
 .report-hidden-container :deep(th),
 .report-hidden-container :deep(td) {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;
 }
+
 .report-hidden-container :deep(th) {
   background-color: #f5f7fa !important;
   font-weight: bold;

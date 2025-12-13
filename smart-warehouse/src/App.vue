@@ -13,13 +13,12 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 </script>
 
 <style>
-/* 简单的全局重置 */
 html, body, #app {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
-  background-color: #0b1120; /* 深空蓝背景，很显高级 */
+  background-color: #0b1120;
   color: #fff;
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
 }

@@ -124,17 +124,15 @@ const handleLogin = () => {
   justify-content: center;
   align-items: center;
   position: relative;
-  /* 背景色由 Vanta 接管，这里不需要写 background 了 */
   overflow: hidden;
 }
 
 .login-box {
   width: 400px;
   padding: 40px;
-  /* 玻璃拟态：半透明背景，透出后面的网格 */
   background: rgba(13, 17, 28, 0.6); 
-  backdrop-filter: blur(10px); /* 毛玻璃模糊 */
-  border: 1px solid rgba(64, 158, 255, 0.2); /* 淡淡的蓝边框 */
+  backdrop-filter: blur(10px); 
+  border: 1px solid rgba(64, 158, 255, 0.2);
   border-radius: 16px;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
   z-index: 10;
@@ -168,7 +166,7 @@ const handleLogin = () => {
   letter-spacing: 2px;
 }
 
-/* 输入框样式 */
+
 :deep(.custom-input .el-input__wrapper) {
   background-color: rgba(0, 0, 0, 0.3) !important; /* 更深一点的透明 */
   box-shadow: none !important;

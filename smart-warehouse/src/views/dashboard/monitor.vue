@@ -2,12 +2,16 @@
   <div class="monitor-container">
     <div class="monitor-header">
       <div class="left">
-        <h2>🧊 3D 仓库数字孪生</h2>
+        <div class="title-group">
+          <h2>🧊 3D 仓库数字孪生</h2>
+          <div class="real-time-clock">{{ currentTime }}</div>
+        </div>
+        
         <el-select 
           v-model="currentZoneId" 
           placeholder="请选择仓库" 
           size="default" 
-          class="zone-select ml-10"
+          class="zone-select ml-20"
           @change="handleZoneChange"
         >
           <template #prefix>
@@ -59,8 +63,8 @@
             <span class="value">[ {{ selectedBin.coordinate ? selectedBin.coordinate.join(', ') : '-' }} ]</span>
           </div>
           <div class="info-item">
-            <span class="label">库存价值</span>
-            <span class="value highlight">¥ {{ selectedBin.value }}</span>
+            <span class="label">占用率 / 价值</span>
+            <span class="value highlight">{{ selectedBin.value }}</span>
           </div>
           <div class="info-item">
             <span class="label">当前状态</span>
@@ -80,13 +84,14 @@ import { Location } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { getDashboardHeatmap } from '@/api/warehouse'; // ✅ 引入新 API
-import { useWarehouseStore } from '@/stores/warehouse'; // ✅ 引入 Store
+import { getDashboardHeatmap } from '@/api/warehouse';
+import { useWarehouseStore } from '@/stores/warehouse';
 
 const threeContainer = ref(null);
 const drawerVisible = ref(false);
 const selectedBin = ref(null);
 const loading = ref(false);
+const currentTime = ref(''); // ✅ 新增：时间状态
 
 const warehouseStore = useWarehouseStore();
 const currentZoneId = ref(null);
@@ -95,20 +100,40 @@ let scene, camera, renderer, controls;
 let raycaster, mouse;
 let cubes = []; 
 let animationId;
+let timeInterval; // ✅ 新增：时间定时器
 let intersectedObject = null;
 
+// 定义颜色映射
 const COLORS = {
   bg: 0x0b1120,
   grid: 0x1f2937,
   floor: 0x111827,
-  boxNormal: 0x3b82f6,   
-  boxWarn: 0xf59e0b,     
-  boxCritical: 0xef4444, 
+  
+  // 颜色分层逻辑
+  boxIdle: 0x67C23A,   // 0-0.2: 绿色 (空闲)
+  boxLow: 0x409EFF,    // 0.2-0.5: 蓝色 (低占用)
+  boxMedium: 0xE6A23C, // 0.5-0.7: 橙色 (中度)
+  boxHigh: 0xF56C6C,   // 0.7-1.0: 红色 (高占用)
+
   hover: 0x00ffff,       
   hoverEmissive: 0x444444 
 };
 
-// --- Three.js 初始化逻辑 (完整) ---
+//更新时间函数
+const updateTime = () => {
+  const now = new Date();
+  currentTime.value = now.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+};
+
+// --- Three.js 初始化逻辑 ---
 const initThree = () => {
   if (!threeContainer.value) return;
   const width = threeContainer.value.clientWidth;
@@ -181,7 +206,6 @@ const createFloor = () => {
   scene.add(plane);
 };
 
-// --- 数据加载与构建 ---
 const loadDataAndBuild = async () => {
   if (!currentZoneId.value) return;
 
@@ -224,9 +248,17 @@ const loadDataAndBuild = async () => {
       points.forEach(point => {
         const [row, col, layer] = point.coordinate || [0,0,0];
 
-        let color = COLORS.boxNormal;
-        if (point.value > 5000) color = COLORS.boxWarn;
-        if (point.value > 20000) color = COLORS.boxCritical;
+        // 颜色逻辑
+        let color = COLORS.boxIdle;
+        const val = Number(point.value) || 0;
+
+        if (val >= 0.2 && val < 0.5) {
+          color = COLORS.boxLow;
+        } else if (val >= 0.5 && val < 0.7) {
+          color = COLORS.boxMedium;
+        } else if (val >= 0.7) {
+          color = COLORS.boxHigh;
+        }
 
         const material = new THREE.MeshStandardMaterial({ 
           color: color, 
@@ -344,17 +376,35 @@ const onWindowResize = () => {
   renderer.setSize(width, height);
 };
 
-const getStatusType = (val) => val > 20000 ? 'danger' : (val > 5000 ? 'warning' : 'success');
-const getStatusText = (val) => val > 20000 ? '爆仓' : (val > 5000 ? '积压' : '正常');
-const getStatusColor = (val) => val > 20000 ? '#F56C6C' : (val > 5000 ? '#E6A23C' : '#67C23A');
+const getStatusType = (val) => {
+  if (val >= 0.7) return 'danger';
+  if (val >= 0.5) return 'warning';
+  if (val >= 0.2) return 'primary'; 
+  return 'success';
+};
+
+const getStatusText = (val) => {
+  if (val >= 0.7) return '高占用';
+  if (val >= 0.5) return '中度占用';
+  if (val >= 0.2) return '低占用';
+  return '空闲';
+};
+
+const getStatusColor = (val) => {
+  if (val >= 0.7) return '#F56C6C';
+  if (val >= 0.5) return '#E6A23C';
+  if (val >= 0.2) return '#409EFF';
+  return '#67C23A';
+};
 
 onMounted(async () => {
+  //启动时间更新
+  updateTime();
+  timeInterval = setInterval(updateTime, 1000);
+
   initThree();
-  
-  // ✅ 获取仓库列表
   await warehouseStore.fetchWarehouses();
 
-  // ✅ 默认选中第一个
   if (warehouseStore.warehouseList.length > 0) {
     currentZoneId.value = warehouseStore.warehouseList[0].warehouse_id;
     loadDataAndBuild();
@@ -362,6 +412,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  //清除定时器
+  if (timeInterval) clearInterval(timeInterval);
+  
   cancelAnimationFrame(animationId);
   window.removeEventListener('resize', onWindowResize);
   window.removeEventListener('mousemove', onMouseMove);
@@ -372,30 +425,131 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.monitor-container { height: 100%; position: relative; background-color: #0b1120; overflow: hidden; }
-.monitor-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-.monitor-header .left, .monitor-header .right { pointer-events: auto; display: flex; align-items: center; }
-.monitor-header h2 { color: #fff; margin: 0; font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-.zone-select { width: 220px; }
-
-.three-canvas { width: 100%; height: 100%; display: block; }
-
-.loading-mask { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #409EFF; text-align: center; }
-.loading-spinner { border: 4px solid rgba(64, 158, 255, 0.3); border-top: 4px solid #409EFF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-.tips { display: flex; gap: 15px; margin-right: 20px; color: #ccc; font-size: 12px; background: rgba(0, 0, 0, 0.6); padding: 6px 16px; border-radius: 20px; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
-
-:deep(.monitor-drawer) { 
-  background-color: rgba(20, 24, 30, 0.95) !important; 
-  backdrop-filter: blur(10px); 
-  border-left: 1px solid #374151; 
-  box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+.monitor-container {
+  height: 100%;
+  position: relative;
+  background-color: #0b1120;
+  overflow: hidden;
 }
-:deep(.el-drawer__title) { color: #fff; font-weight: bold; }
-:deep(.el-drawer__body) { padding: 20px; }
 
-.bin-code { font-size: 24px; color: #409EFF; margin: 0 0 10px 0; font-family: 'DIN', monospace; letter-spacing: 1px; }
+.monitor-header {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.monitor-header .left,
+.monitor-header .right {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.monitor-header h2 {
+  color: #fff;
+  margin: 0;
+  font-size: 20px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/*时间样式 */
+.real-time-clock {
+  color: #909399;
+  font-size: 14px;
+  font-family: 'DIN', monospace;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+.zone-select {
+  width: 220px;
+}
+
+.ml-20 {
+  margin-left: 20px;
+}
+
+.three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.loading-mask {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #409EFF;
+  text-align: center;
+}
+
+.loading-spinner {
+  border: 4px solid rgba(64, 158, 255, 0.3);
+  border-top: 4px solid #409EFF;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.tips {
+  display: flex;
+  gap: 15px;
+  margin-right: 20px;
+  color: #ccc;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 16px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+:deep(.monitor-drawer) {
+  background-color: rgba(20, 24, 30, 0.95) !important;
+  backdrop-filter: blur(10px);
+  border-left: 1px solid #374151;
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+}
+
+:deep(.el-drawer__title) {
+  color: #fff;
+  font-weight: bold;
+}
+
+:deep(.el-drawer__body) {
+  padding: 20px;
+}
+
+.bin-code {
+  font-size: 24px;
+  color: #409EFF;
+  margin: 0 0 10px 0;
+  font-family: 'DIN', monospace;
+  letter-spacing: 1px;
+}
 
 .info-grid {
   display: flex;
@@ -427,6 +581,4 @@ onBeforeUnmount(() => {
   color: #409EFF;
   font-size: 18px;
 }
-
-.ml-10 { margin-left: 10px; }
 </style>

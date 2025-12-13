@@ -6,7 +6,7 @@ import { getWarehouses } from '@/api/warehouse';
 export const useWarehouseStore = defineStore('warehouse', () => {
   // --- State (数据) ---
   const logs = ref([]); // 全局日志列表
-  const warehouseList = ref([]); // ✅ 仓库列表
+  const warehouseList = ref([]); //仓库列表
 
   // 初始化日志
   const initLogs = () => {
@@ -18,7 +18,7 @@ export const useWarehouseStore = defineStore('warehouse', () => {
 
   // --- Actions (行为) ---
 
-  // ✅ 获取仓库列表 Action
+  //获取仓库列表 Action
   const fetchWarehouses = async () => {
     // 简单缓存机制：如果有数据就不查了，可根据需求改为强制刷新
     if (warehouseList.value.length > 0) return;
